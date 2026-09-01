@@ -31,7 +31,7 @@ export function registerTemplateTools(client: TreeflowClient) {
           description: { type: 'string', description: 'Descripción corta opcional' },
           responses: {
             type: 'array',
-            description: 'Arreglo de bloques enriquecidos (RichBlocks) que componen el mensaje (cards, buttons, carousels, text, images)',
+            description: 'Arreglo de bloques enriquecidos (RichBlocks) compatibles con WhatsApp, Webchat y Telegram. Tipos soportados: text ({type: "text", text: "..."}), card ({type: "card", title, subtitle, imageUrl, buttons: [{label, url, payload}]}), quick_replies ({type: "quick_replies", options: ["Opción 1", "Opción 2"]}), carousel ({type: "carousel", cards: [...]}), image ({type: "image", url}), audio ({type: "audio", url}), file ({type: "file", url, filename}), location ({type: "location", latitude, longitude, address}).',
             items: { type: 'object' },
           },
         },

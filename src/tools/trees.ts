@@ -97,22 +97,5 @@ export function registerTreeTools(client: TreeflowClient) {
         };
       },
     },
-    {
-      name: 'treeflow_delete_tree',
-      description: 'Elimina un bot de Treeflow de forma permanente.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tree_id: { type: 'string', description: 'ID del bot a eliminar' },
-        },
-        required: ['tree_id'],
-      },
-      handler: async (args: { tree_id: string }) => {
-        const result = await client.deleteTree(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
-      },
-    },
   ];
 }

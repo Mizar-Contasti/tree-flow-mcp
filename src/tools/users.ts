@@ -59,23 +59,6 @@ export function registerUserTools(client: TreeflowClient) {
       },
     },
     {
-      name: 'treeflow_delete_user',
-      description: 'Elimina un usuario del workspace.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          user_id: { type: 'string', description: 'ID del usuario a eliminar' },
-        },
-        required: ['user_id'],
-      },
-      handler: async (args: { user_id: string }) => {
-        const result = await client.deleteUser(args.user_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
-      },
-    },
-    {
       name: 'treeflow_list_credentials',
       description: 'Lista los proveedores de IA configurados en el workspace (OpenAI, Gemini, Groq, Twilio, Meta) para verificar disponibilidad.',
       inputSchema: {

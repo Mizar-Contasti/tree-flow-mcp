@@ -92,30 +92,4 @@ export declare function registerUserTools(client: TreeflowClient): ({
             text: string;
         }[];
     }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            user_id: {
-                type: string;
-                description: string;
-            };
-            username?: undefined;
-            email?: undefined;
-            role?: undefined;
-            name?: undefined;
-            is_active?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        user_id: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
 })[];
