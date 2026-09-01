@@ -1,5 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-export declare function registerDiagnosticTools(client: TreeflowClient): ({
+export declare function registerFertilizerTools(client: TreeflowClient): ({
     name: string;
     description: string;
     inputSchema: {
@@ -9,39 +9,10 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            message: {
-                type: string;
-                description: string;
-            };
-            session_id: {
-                type: string;
-                description: string;
-            };
-        };
-        required: string[];
-    };
-    handler: (args: {
-        tree_id: string;
-        message: string;
-        session_id?: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
-            message?: undefined;
-            session_id?: undefined;
+            name?: undefined;
+            fertilizer_type?: undefined;
+            config?: undefined;
+            fertilizer_id?: undefined;
         };
         required: string[];
     };
@@ -63,17 +34,56 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            session_id: {
+            name: {
                 type: string;
                 description: string;
             };
-            message?: undefined;
+            fertilizer_type: {
+                type: string;
+                description: string;
+            };
+            config: {
+                type: string;
+                description: string;
+            };
+            fertilizer_id?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         tree_id: string;
-        session_id: string;
+        name: string;
+        fertilizer_type: string;
+        config: any;
+    }) => Promise<{
+        content: {
+            type: string;
+            text: string;
+        }[];
+    }>;
+} | {
+    name: string;
+    description: string;
+    inputSchema: {
+        type: string;
+        properties: {
+            tree_id: {
+                type: string;
+                description: string;
+            };
+            fertilizer_id: {
+                type: string;
+                description: string;
+            };
+            name?: undefined;
+            fertilizer_type?: undefined;
+            config?: undefined;
+        };
+        required: string[];
+    };
+    handler: (args: {
+        tree_id: string;
+        fertilizer_id: string;
     }) => Promise<{
         content: {
             type: string;

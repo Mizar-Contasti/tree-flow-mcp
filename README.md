@@ -1,6 +1,6 @@
 # 🌲 Treeflow MCP Server
 
-Conecta **Claude Desktop**, **Claude Code** o **Cursor** directamente a tu plataforma de **Treeflow** para crear, modificar, diseñar y entrenar chatbots en lenguaje natural desde el chat de Claude.
+Conecta **Claude Desktop**, **Claude Code**, **Cursor** o cualquier cliente MCP directamente a tu plataforma **Treeflow** para administrar, diseñar, entrenar y diagnosticar chatbots inteligentes usando lenguaje natural.
 
 ---
 
@@ -46,22 +46,88 @@ Cierra y vuelve a abrir Claude Desktop. Verás el icono del martillo 🛠️ ind
 
 ---
 
-## 💬 Ejemplos de lo que puedes pedirle a Claude
+## 🛠️ Catálogo Completo de Herramientas (47 Tools)
 
-* *"Lista los bots disponibles en mi workspace de Treeflow."*
-* *"Crea un nuevo bot para un restaurante italiano con propósito 'restaurante' en idioma español."*
-* *"Agrega una intención llamada 'reservar_mesa' con 5 frases de entrenamiento y lánzale un entrenamiento."*
-* *"En el bot de Ventas, crea una rama en el canvas llamada 'Bienvenida' y añade un nodo de mensaje de saludo."*
-* *"Simula un mensaje de prueba que diga '¿Tienen mesas disponibles para hoy?' y dime qué intención detectó."*
+A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupado por módulo:
+
+### 1. 🤖 Gestión de Bots (Árboles)
+* `treeflow_list_trees`: Lista todos los bots del workspace.
+* `treeflow_get_tree`: Obtiene configuración detallada de un bot específico.
+* `treeflow_get_tree_data`: Obtiene la estructura COMPLETA del bot en un solo llamado (ramas, nodos, intenciones, entidades y plantillas).
+* `treeflow_create_tree`: Crea un nuevo bot con nombre, propósito (hotel, restaurante, clínica, etc.) e idioma principal.
+* `treeflow_update_tree`: Modifica parámetros avanzados de NLP, umbrales de confianza (ML / difuso), análisis de sentimiento y modos de operación.
+* `treeflow_delete_tree`: Elimina un bot permanentemente.
+
+### 2. 🌿 Canvas & Flujos Visuales (Branches & Leafs)
+* `treeflow_list_branches`: Lista todas las ramas de conversación del canvas.
+* `treeflow_create_branch`: Crea una nueva rama y su nodo de inicio.
+* `treeflow_update_branch`: Modifica el nombre o descripción de una rama.
+* `treeflow_delete_branch`: Elimina una rama y todos sus nodos.
+* `treeflow_list_leafs`: Lista todos los nodos de una rama seleccionada.
+* `treeflow_create_leaf`: Crea un nodo en el lienzo (`message`, `trigger_context`, `intent`, `action`, `condition`, `webhook`) con su configuración y posición `(x, y)`.
+* `treeflow_update_leaf`: Modifica el contenido, posición o comportamiento de un nodo.
+* `treeflow_delete_leaf`: Elimina un nodo del canvas.
+
+### 3. 🧠 NLU: Intenciones & Extracción de Parámetros (Slots)
+* `treeflow_list_intents`: Lista las intenciones NLU con sus frases y slots configurados.
+* `treeflow_create_intent`: Crea una intención con frases de entrenamiento y parámetros requeridos (`entity_name`, `required`, `prompt`).
+* `treeflow_update_intent`: Actualiza frases de entrenamiento, nombre o parámetros de una intención.
+* `treeflow_delete_intent`: Elimina una intención.
+
+### 4. 🏷️ NLU: Entidades & Sinónimos
+* `treeflow_list_entities`: Lista todas las entidades del bot.
+* `treeflow_create_entity`: Crea una entidad (`simple` con sinónimos, `composite` o `regex`).
+* `treeflow_update_entity`: Modifica valores canónicos, sinónimos o patrones regex.
+* `treeflow_delete_entity`: Elimina una entidad.
+
+### 5. 💬 Respuestas & Plantillas Enriquecidas
+* `treeflow_list_message_templates`: Lista las plantillas de mensaje del bot.
+* `treeflow_create_message_template`: Crea plantillas con texto de respaldo y bloques enriquecidos (tarjetas, botones, carruseles, audios).
+* `treeflow_update_message_template`: Actualiza una plantilla existente.
+* `treeflow_delete_message_template`: Elimina una plantilla.
+
+### 6. 🧪 Fertilizantes & Knowledge Base (RAG)
+* `treeflow_list_fertilizers`: Lista herramientas adicionales, scripts y Knowledge Base configurados.
+* `treeflow_create_fertilizer`: Agrega una herramienta externa, automatización o base de conocimiento.
+* `treeflow_delete_fertilizer`: Elimina una herramienta o fertilizante.
+
+### 7. 🔌 Canales & Integraciones (Injertos)
+* `treeflow_list_integrations`: Consulta el estado de los canales (WhatsApp, Webchat, Telegram, Webhooks).
+* `treeflow_configure_integration`: Activa, desactiva o ajusta credenciales de canales de mensajería.
+
+### 8. 🎙️ Configuración de Voz (STT / TTS)
+* `treeflow_get_voice_config`: Consulta el estado de Speech-To-Text (Whisper) y Text-To-Speech (Piper), voz y velocidad.
+* `treeflow_update_voice_config`: Configura modelos de audio, idioma, voces y velocidad de reproducción.
+
+### 9. 📈 Entrenamiento & Historial de Machine Learning
+* `treeflow_trigger_training`: Dispara el re-entrenamiento del modelo NLU de Machine Learning.
+* `treeflow_get_training_status`: Consulta el estado en vivo del entrenamiento.
+* `treeflow_list_training_history`: Historial completo de entrenamientos con métricas y logs de error.
+
+### 10. 💬 Simulación, Conversaciones & Diagnóstico
+* `treeflow_simulate_message`: Envía un mensaje de prueba al bot y recibe la intención detectada, score, entidades extraídas, respuesta y transición de nodos.
+* `treeflow_list_conversations`: Lista las conversaciones recientes registradas en el bot.
+* `treeflow_get_conversation`: Obtiene todos los turnos y mensajes detallados de una sesión.
+
+### 11. 🛡️ Auditoría & Respaldos (Backups)
+* `treeflow_list_change_history`: Historial de auditoría para saber qué usuario modificó qué elemento y cuándo.
+* `treeflow_list_backups`: Lista los snapshots de seguridad del bot.
+* `treeflow_create_backup`: Crea un snapshot completo antes de realizar cambios importantes.
+
+### 12. 👥 Usuarios & Credenciales del Workspace
+* `treeflow_list_users`: Lista los miembros y roles del workspace.
+* `treeflow_create_user`: Invita un nuevo usuario al workspace.
+* `treeflow_update_user`: Modifica rol o estado de un usuario.
+* `treeflow_delete_user`: Elimina un usuario del workspace.
+* `treeflow_list_credentials`: Verifica proveedores de IA activos (OpenAI, Gemini, Groq, Twilio, Meta).
 
 ---
 
-## 🛠️ ¿Qué puede hacer Claude con este servidor MCP?
+## 💬 Ejemplos de lo que puedes pedirle a Claude
 
-| Módulo | Acciones que Claude puede realizar |
-| :--- | :--- |
-| **🤖 Bots (Árboles)** | Listar, crear, inspeccionar, actualizar y eliminar bots. |
-| **🌿 Canvas de Flujos** | Crear ramas (*Branches*), agregar nodos (*Leafs* de mensajes, inputs, condiciones, webhooks) y organizar el lienzo. |
-| **🧠 NLU & Entrenamiento** | Crear intenciones con frases de entrenamiento, definir entidades con sinónimos y disparar entrenamientos del modelo. |
-| **💬 Respuestas** | Crear y editar plantillas de mensajes y respuestas dinámicas. |
-| **⚡ Diagnóstico & Pruebas** | Simular conversaciones en tiempo real y ver resultados de detección. |
+* *"Hazme un resumen completo del bot 'Soporte Comercial' usando `treeflow_get_tree_data`."*
+* *"Crea una intención 'consultar_disponibilidad' con 6 frases de entrenamiento y un parámetro 'fecha' de tipo @sys.date."*
+* *"Crea una rama llamada 'Flujo_Reservas', agrégale un nodo de mensaje y conéctalo al canvas."*
+* *"Activa la integración de WhatsApp y configura la voz TTS en español con velocidad 1.1."*
+* *"Simula una conversación enviando 'Hola quiero cancelar mi pedido' y dime qué intención detectó el bot."*
+* *"Crea un respaldo de seguridad del bot antes de que empecemos a modificar los flujos."*

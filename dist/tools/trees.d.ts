@@ -10,7 +10,12 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             description?: undefined;
             purpose?: undefined;
             primary_language?: undefined;
+            webhook_url?: undefined;
             nlp_mode?: undefined;
+            sentiment_analysis_enabled?: undefined;
+            ml_confidence_threshold?: undefined;
+            fuzzy_confidence_threshold?: undefined;
+            mode?: undefined;
         };
         required?: undefined;
     };
@@ -34,7 +39,12 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             description?: undefined;
             purpose?: undefined;
             primary_language?: undefined;
+            webhook_url?: undefined;
             nlp_mode?: undefined;
+            sentiment_analysis_enabled?: undefined;
+            ml_confidence_threshold?: undefined;
+            fuzzy_confidence_threshold?: undefined;
+            mode?: undefined;
         };
         required: string[];
     };
@@ -69,7 +79,12 @@ export declare function registerTreeTools(client: TreeflowClient): ({
                 description: string;
             };
             tree_id?: undefined;
+            webhook_url?: undefined;
             nlp_mode?: undefined;
+            sentiment_analysis_enabled?: undefined;
+            ml_confidence_threshold?: undefined;
+            fuzzy_confidence_threshold?: undefined;
+            mode?: undefined;
         };
         required: string[];
     };
@@ -106,7 +121,27 @@ export declare function registerTreeTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            webhook_url: {
+                type: string;
+                description: string;
+            };
             nlp_mode: {
+                type: string;
+                description: string;
+            };
+            sentiment_analysis_enabled: {
+                type: string;
+                description: string;
+            };
+            ml_confidence_threshold: {
+                type: string;
+                description: string;
+            };
+            fuzzy_confidence_threshold: {
+                type: string;
+                description: string;
+            };
+            mode: {
                 type: string;
                 description: string;
             };

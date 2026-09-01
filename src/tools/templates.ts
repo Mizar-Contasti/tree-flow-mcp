@@ -4,7 +4,7 @@ export function registerTemplateTools(client: TreeflowClient) {
   return [
     {
       name: 'treeflow_list_message_templates',
-      description: 'Lista todas las plantillas de mensajes y respuestas configuradas en un bot de Treeflow.',
+      description: 'Lista todas las plantillas de mensajes y respuestas enriquecidas configuradas en un bot de Treeflow.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -21,22 +21,28 @@ export function registerTemplateTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_create_message_template',
-      description: 'Crea una nueva plantilla de respuesta de mensaje (con soporte para variaciones y variables como {nombre}).',
+      description: 'Crea una nueva plantilla de mensaje (MessageTemplate) para respuestas estructuradas o enriquecidas (texto plano, botones, tarjetas, carruseles, audios).',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
-          name: { type: 'string', description: 'Nombre identificador de la plantilla (ej. respuesta_bienvenida)' },
-          template: { type: 'string', description: 'Texto del mensaje o plantilla' },
-          variations: { type: 'array', items: { type: 'string' }, description: 'Variaciones alternativas de la respuesta' },
+          name: { type: 'string', description: 'Nombre representativo de la plantilla (ej. respuesta_bienvenida, menu_principal)' },
+          text: { type: 'string', description: 'Texto plano de respaldo (fallback text)' },
+          description: { type: 'string', description: 'Descripción corta opcional' },
+          responses: {
+            type: 'array',
+            description: 'Arreglo de bloques enriquecidos (RichBlocks) que componen el mensaje (cards, buttons, carousels, text, images)',
+            items: { type: 'object' },
+          },
         },
-        required: ['tree_id', 'name', 'template'],
+        required: ['tree_id', 'name'],
       },
-      handler: async (args: { tree_id: string; name: string; template: string; variations?: string[] }) => {
+      handler: async (args: { tree_id: string; name: string; text?: string; description?: string; responses?: any[] }) => {
         const result = await client.createMessageTemplate(args.tree_id, {
           name: args.name,
-          template: args.template,
-          variations: args.variations || [],
+          text: args.text || args.name,
+          description: args.description,
+          responses: args.responses || [{ type: 'text', text: args.text || args.name }],
         });
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -45,22 +51,24 @@ export function registerTemplateTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_update_message_template',
-      description: 'Actualiza el texto o variaciones de una plantilla de mensaje existente.',
+      description: 'Actualiza una plantilla de mensaje existente (texto plano o bloques enriquecidos).',
       inputSchema: {
         type: 'object',
         properties: {
-          template_id: { type: 'string', description: 'ID de la plantilla' },
+          template_id: { type: 'string', description: 'ID de la plantilla a actualizar' },
           name: { type: 'string', description: 'Nuevo nombre' },
-          template: { type: 'string', description: 'Nuevo texto de la plantilla' },
-          variations: { type: 'array', items: { type: 'string' }, description: 'Nuevas variaciones' },
+          text: { type: 'string', description: 'Nuevo texto plano fallback' },
+          description: { type: 'string', description: 'Nueva descripción' },
+          responses: { type: 'array', items: { type: 'object' }, description: 'Nuevo arreglo de bloques enriquecidos' },
         },
         required: ['template_id'],
       },
-      handler: async (args: { template_id: string; name?: string; template?: string; variations?: string[] }) => {
+      handler: async (args: { template_id: string; name?: string; text?: string; description?: string; responses?: any[] }) => {
         const result = await client.updateMessageTemplate(args.template_id, {
           name: args.name,
-          template: args.template,
-          variations: args.variations,
+          text: args.text,
+          description: args.description,
+          responses: args.responses,
         });
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

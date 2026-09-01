@@ -4,7 +4,7 @@ export function registerIntentTools(client: TreeflowClient) {
   return [
     {
       name: 'treeflow_list_intents',
-      description: 'Lista todas las intenciones NLU de un bot con sus frases de entrenamiento y entidades configuradas.',
+      description: 'Lista todas las intenciones NLU de un bot con sus frases de entrenamiento y parámetros/slots asociados.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -21,12 +21,12 @@ export function registerIntentTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_create_intent',
-      description: 'Crea una nueva intención NLU con frases de entrenamiento (patterns) para el bot.',
+      description: 'Crea una nueva intención NLU con frases de entrenamiento (patterns) y slots de parámetros requeridos (ej. fecha, cantidad, tipo_habitacion).',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
-          name: { type: 'string', description: 'Nombre único de la intención (ej. saludo, reservar_mesa, consultar_saldo)' },
+          name: { type: 'string', description: 'Nombre único de la intención (ej. saludo, reservar_mesa, consultar_precio)' },
           patterns: {
             type: 'array',
             items: { type: 'string' },
@@ -34,8 +34,17 @@ export function registerIntentTools(client: TreeflowClient) {
           },
           entities: {
             type: 'array',
-            items: { type: 'object' },
-            description: 'Entidades asociadas a extraer en esta intención (opcional)',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Nombre del parámetro/variable' },
+                entity_name: { type: 'string', description: 'Nombre de la entidad asignada (ej. sys.number, @tipo_habitacion)' },
+                required: { type: 'boolean', description: 'Si el slot es obligatorio' },
+                prompt: { type: 'string', description: 'Pregunta de repregunta si falta el valor' },
+              },
+              required: ['name', 'entity_name'],
+            },
+            description: 'Parámetros o slots a extraer en esta intención',
           },
           type: { type: 'string', description: 'Tipo: conversational o contextual. Por defecto: conversational' },
         },
@@ -55,7 +64,7 @@ export function registerIntentTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_update_intent',
-      description: 'Actualiza el nombre, frases de entrenamiento o entidades de una intención existente.',
+      description: 'Actualiza el nombre, frases de entrenamiento o slots/parámetros de una intención existente.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -63,7 +72,20 @@ export function registerIntentTools(client: TreeflowClient) {
           intent_id: { type: 'string', description: 'ID de la intención' },
           name: { type: 'string', description: 'Nuevo nombre' },
           patterns: { type: 'array', items: { type: 'string' }, description: 'Nuevas frases de entrenamiento' },
-          entities: { type: 'array', items: { type: 'object' }, description: 'Entidades' },
+          entities: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                entity_name: { type: 'string' },
+                required: { type: 'boolean' },
+                prompt: { type: 'string' },
+              },
+              required: ['name', 'entity_name'],
+            },
+            description: 'Nuevos parámetros',
+          },
         },
         required: ['tree_id', 'intent_id'],
       },

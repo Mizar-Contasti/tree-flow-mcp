@@ -50,6 +50,25 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 type: string;
                 items: {
                     type: string;
+                    properties: {
+                        name: {
+                            type: string;
+                            description: string;
+                        };
+                        entity_name: {
+                            type: string;
+                            description: string;
+                        };
+                        required: {
+                            type: string;
+                            description: string;
+                        };
+                        prompt: {
+                            type: string;
+                            description: string;
+                        };
+                    };
+                    required: string[];
                 };
                 description: string;
             };
@@ -102,6 +121,25 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 type: string;
                 items: {
                     type: string;
+                    properties: {
+                        name: {
+                            type: string;
+                            description?: undefined;
+                        };
+                        entity_name: {
+                            type: string;
+                            description?: undefined;
+                        };
+                        required: {
+                            type: string;
+                            description?: undefined;
+                        };
+                        prompt: {
+                            type: string;
+                            description?: undefined;
+                        };
+                    };
+                    required: string[];
                 };
                 description: string;
             };

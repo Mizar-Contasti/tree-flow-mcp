@@ -1,5 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-export declare function registerDiagnosticTools(client: TreeflowClient): ({
+export declare function registerIntegrationTools(client: TreeflowClient): ({
     name: string;
     description: string;
     inputSchema: {
@@ -9,39 +9,9 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            message: {
-                type: string;
-                description: string;
-            };
-            session_id: {
-                type: string;
-                description: string;
-            };
-        };
-        required: string[];
-    };
-    handler: (args: {
-        tree_id: string;
-        message: string;
-        session_id?: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
-            message?: undefined;
-            session_id?: undefined;
+            integration_key?: undefined;
+            enabled?: undefined;
+            config?: undefined;
         };
         required: string[];
     };
@@ -63,17 +33,26 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            session_id: {
+            integration_key: {
                 type: string;
                 description: string;
             };
-            message?: undefined;
+            enabled: {
+                type: string;
+                description: string;
+            };
+            config: {
+                type: string;
+                description: string;
+            };
         };
         required: string[];
     };
     handler: (args: {
         tree_id: string;
-        session_id: string;
+        integration_key: string;
+        enabled: boolean;
+        config?: any;
     }) => Promise<{
         content: {
             type: string;

@@ -2,13 +2,13 @@ export function registerDiagnosticTools(client) {
     return [
         {
             name: 'treeflow_simulate_message',
-            description: 'Envía un mensaje de prueba al bot para evaluar en tiempo real la detección de intención, entidades extraídas, respuesta generada y transición de nodos.',
+            description: 'Envía un mensaje de prueba a la consola del bot para probar en tiempo real el flujo conversacional. Retorna la respuesta del bot, la intención detectada con su score de confianza, entidades extraídas y el nuevo estado/nodo de la sesión.',
             inputSchema: {
                 type: 'object',
                 properties: {
                     tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    message: { type: 'string', description: 'Mensaje de usuario a simular (ej. "Hola quiero hacer una reserva para 2")' },
-                    session_id: { type: 'string', description: 'ID de sesión opcional para continuar una conversación de prueba' },
+                    message: { type: 'string', description: 'El mensaje de texto que el usuario escribe al bot' },
+                    session_id: { type: 'string', description: 'ID de sesión para el chat simulado (opcional, genera uno automáticamente si no se envía)' },
                 },
                 required: ['tree_id', 'message'],
             },
@@ -21,7 +21,7 @@ export function registerDiagnosticTools(client) {
         },
         {
             name: 'treeflow_list_conversations',
-            description: 'Lista las conversaciones recientes registradas en el bot.',
+            description: 'Lista las conversaciones más recientes registradas en este bot.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -31,6 +31,24 @@ export function registerDiagnosticTools(client) {
             },
             handler: async (args) => {
                 const result = await client.listConversations(args.tree_id);
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                };
+            },
+        },
+        {
+            name: 'treeflow_get_conversation',
+            description: 'Obtiene los detalles completos y todos los turnos de mensaje (usuario y bot) de una conversación específica.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    tree_id: { type: 'string', description: 'ID del bot/árbol' },
+                    session_id: { type: 'string', description: 'ID de la sesión de conversación' },
+                },
+                required: ['tree_id', 'session_id'],
+            },
+            handler: async (args) => {
+                const result = await client.getConversation(args.tree_id, args.session_id);
                 return {
                     content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
                 };

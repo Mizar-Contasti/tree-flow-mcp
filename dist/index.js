@@ -9,8 +9,13 @@ import { registerLeafTools } from './tools/leafs.js';
 import { registerIntentTools } from './tools/intents.js';
 import { registerEntityTools } from './tools/entities.js';
 import { registerTemplateTools } from './tools/templates.js';
+import { registerFertilizerTools } from './tools/fertilizers.js';
+import { registerIntegrationTools } from './tools/integrations.js';
+import { registerVoiceTools } from './tools/voice.js';
 import { registerTrainingTools } from './tools/training.js';
 import { registerDiagnosticTools } from './tools/diagnostics.js';
+import { registerHistoryTools } from './tools/history.js';
+import { registerUserTools } from './tools/users.js';
 async function main() {
     const client = new TreeflowClient();
     const server = new Server({
@@ -21,7 +26,7 @@ async function main() {
             tools: {},
         },
     });
-    // Recolectar todas las herramientas disponibles
+    // Recolectar todas las herramientas disponibles (Catálogo completo de Treeflow)
     const allTools = [
         ...registerTreeTools(client),
         ...registerBranchTools(client),
@@ -29,8 +34,13 @@ async function main() {
         ...registerIntentTools(client),
         ...registerEntityTools(client),
         ...registerTemplateTools(client),
+        ...registerFertilizerTools(client),
+        ...registerIntegrationTools(client),
+        ...registerVoiceTools(client),
         ...registerTrainingTools(client),
         ...registerDiagnosticTools(client),
+        ...registerHistoryTools(client),
+        ...registerUserTools(client),
     ];
     const toolsMap = new Map();
     const toolsList = allTools.map((t) => {
@@ -80,7 +90,7 @@ async function main() {
     });
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error('🚀 Treeflow MCP Server running on STDIO transport');
+    console.error(`🚀 Treeflow MCP Server running (${toolsList.length} tools registered)`);
 }
 main().catch((err) => {
     console.error('Fatal error running Treeflow MCP Server:', err);
