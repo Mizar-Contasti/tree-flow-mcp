@@ -56,6 +56,7 @@ export declare class TreeflowClient {
         entities?: any[];
         type?: string;
     }): Promise<any>;
+    getIntent(treeId: string, intentId: string): Promise<any>;
     updateIntent(treeId: string, intentId: string, data: {
         name?: string;
         patterns?: string[];
@@ -70,6 +71,7 @@ export declare class TreeflowClient {
         values?: any[];
         pattern?: string;
     }): Promise<any>;
+    getEntity(treeId: string, entityId: string): Promise<any>;
     updateEntity(treeId: string, entityId: string, data: {
         name?: string;
         type?: string;

@@ -1,5 +1,25 @@
 import axios, { AxiosInstance } from 'axios';
+import { randomUUID } from 'node:crypto';
 import { getConfig } from '../config.js';
+
+// Descarta las claves sin valor para no pisar el estado actual con undefined.
+function pickDefined<T extends Record<string, any>>(data: T): Partial<T> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out as Partial<T>;
+}
+
+// El backend valida los valores de entidad como { key, synonyms }.
+// Se acepta `value` como alias de `key` por comodidad al dictarlos.
+function normalizeEntityValues(values?: any[]) {
+  return (values || []).map((v) => ({
+    key: v?.key ?? v?.value ?? '',
+    synonyms: v?.synonyms ?? [],
+    ...(v?.entity ? { entity: v.entity } : {}),
+  }));
+}
 
 export class TreeflowClient {
   private client: AxiosInstance;
@@ -133,13 +153,31 @@ export class TreeflowClient {
     return response.data;
   }
 
+  // IntentSchema exige id y type en la creación.
   async createIntent(treeId: string, data: { name: string; patterns: string[]; entities?: any[]; type?: string }) {
-    const response = await this.client.post(`/trees/${treeId}/intents`, data);
+    const response = await this.client.post(`/trees/${treeId}/intents`, {
+      id: randomUUID(),
+      name: data.name,
+      type: data.type || 'conversational',
+      patterns: data.patterns,
+      entities: data.entities ?? [],
+    });
     return response.data;
   }
 
+  async getIntent(treeId: string, intentId: string) {
+    const response = await this.client.get(`/trees/${treeId}/intents/${intentId}`);
+    return response.data;
+  }
+
+  // IntentUpdate es un reemplazo completo (exige name, type y patterns),
+  // asi que se parte del estado actual y encima van los campos recibidos.
   async updateIntent(treeId: string, intentId: string, data: { name?: string; patterns?: string[]; entities?: any[]; type?: string }) {
-    const response = await this.client.put(`/trees/${treeId}/intents/${intentId}`, data);
+    const current = await this.getIntent(treeId, intentId);
+    const response = await this.client.put(`/trees/${treeId}/intents/${intentId}`, {
+      ...current,
+      ...pickDefined(data),
+    });
     return response.data;
   }
 
@@ -154,13 +192,33 @@ export class TreeflowClient {
     return response.data;
   }
 
+  // EntitySchema exige id, name y type; los valores van como { key, synonyms }.
   async createEntity(treeId: string, data: { name: string; type?: string; values?: any[]; pattern?: string }) {
-    const response = await this.client.post(`/trees/${treeId}/entities`, data);
+    const response = await this.client.post(`/trees/${treeId}/entities`, {
+      id: randomUUID(),
+      name: data.name,
+      type: data.type || 'simple',
+      values: normalizeEntityValues(data.values),
+      ...(data.pattern ? { pattern: data.pattern } : {}),
+    });
     return response.data;
   }
 
+  // Ojo: la lectura de una entidad suelta sólo existe bajo /entities,
+  // no bajo el alias /trees que usan el resto de operaciones.
+  async getEntity(treeId: string, entityId: string) {
+    const response = await this.client.get(`/entities/${treeId}/${entityId}`);
+    return response.data;
+  }
+
+  // EntityUpdate tambien es un reemplazo completo (exige name y type).
   async updateEntity(treeId: string, entityId: string, data: { name?: string; type?: string; values?: any[]; pattern?: string }) {
-    const response = await this.client.put(`/trees/${treeId}/entities/${entityId}`, data);
+    const current = await this.getEntity(treeId, entityId);
+    const response = await this.client.put(`/trees/${treeId}/entities/${entityId}`, {
+      ...current,
+      ...pickDefined(data),
+      ...(data.values ? { values: normalizeEntityValues(data.values) } : {}),
+    });
     return response.data;
   }
 
@@ -258,11 +316,14 @@ export class TreeflowClient {
   }
 
   // --- 11. CONVERSACIONES & SIMULADOR ---
+  // El motor espera un evento tipado: { type, value }, no { message }.
   async simulateChatMessage(treeId: string, message: string, sessionId?: string) {
     const response = await this.client.post('/message', {
+      type: 'text',
+      value: message,
       tree_id: treeId,
-      message,
       session_id: sessionId || `mcp_sim_${Date.now()}`,
+      source: 'mcp',
     });
     return response.data;
   }
