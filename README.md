@@ -1,124 +1,67 @@
-# 🌲 Treeflow MCP Server (`treeflow-mcp`)
+# 🌲 Treeflow MCP Server
 
-El **Servidor MCP oficial de Treeflow** permite a **Claude Desktop**, **Claude Code**, **Cursor**, **Zed** y cualquier cliente compatible con el **Model Context Protocol (MCP)** conectarse directamente a tu plataforma Treeflow para:
-
-* 🤖 **Crear, editar y listar Chatbots / Árboles**
-* 🌿 **Diseñar el Canvas de Flujos:** Crear ramas (*Branches*) y nodos (*Leafs* de mensajes, inputs, condiciones, webhooks)
-* 🧠 **Entrenar NLU:** Crear y actualizar intenciones, frases de entrenamiento y entidades (sinónimos y valores)
-* 💬 **Plantillas de Respuestas:** Administrar mensajes y variaciones de texto
-* ⚡ **Simulación & Diagnóstico:** Probar conversaciones y evaluar respuestas en tiempo real
+Conecta **Claude Desktop**, **Claude Code** o **Cursor** directamente a tu plataforma de **Treeflow** para crear, modificar, diseñar y entrenar chatbots en lenguaje natural desde el chat de Claude.
 
 ---
 
-## 🚀 Inicio Rápido con Claude Desktop
+## ⚡ Guía Rápida de Conexión (3 Pasos)
 
-### 1. Obtén tu API Key de Treeflow
-1. Abre tu panel de Treeflow.
-2. Ve a **Cuentas** -> pestaña **Claves de API**.
-3. Haz clic en **"Nueva Clave de API"**, asígnala a tu usuario y copia la clave generada (`tf_live_...`).
+### Paso 1: Genera tu clave de API en Treeflow
+1. Abre tu panel de **Treeflow** en el navegador.
+2. Ve a **Cuentas** ➡️ Pestaña **Claves de API**.
+3. Haz clic en **"Nueva Clave de API"**, asígnala a tu usuario y **copia la clave generada** (`tf_live_...`).
 
-### 2. Configura Claude Desktop
-Abre tu archivo de configuración de Claude Desktop:
-* **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-* **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+---
 
-Agrega `treeflow` en `mcpServers`:
+### Paso 2: Pega la configuración en Claude Desktop
+Abre el archivo de configuración de Claude en tu computadora:
+
+* 🪟 **Windows:** Presiona `Win + R`, pega `%APPDATA%\Claude\claude_desktop_config.json` y presiona Enter.
+* 🍎 **Mac:** Abre `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+Pega el siguiente bloque dentro de `"mcpServers"` (reemplaza `TREEFLOW_API_KEY` con tu clave del Paso 1):
 
 ```json
 {
   "mcpServers": {
     "treeflow": {
       "command": "npx",
-      "args": ["-y", "treeflow-mcp"],
+      "args": ["-y", "github:Mizar-Contasti/tree-flow-mcp"],
       "env": {
         "TREEFLOW_URL": "http://localhost:8000",
-        "TREEFLOW_API_KEY": "tf_live_tu_clave_secreta_aqui",
-        "TREEFLOW_WORKSPACE_ID": "tu-workspace-id"
+        "TREEFLOW_API_KEY": "tf_live_tu_clave_aqui",
+        "TREEFLOW_WORKSPACE_ID": "botsmexico"
       }
     }
   }
 }
 ```
 
-> **Si estás desarrollando en local:**
-> Puedes ejecutar el servidor compilado directamente con `node`:
-> ```json
-> {
->   "mcpServers": {
->     "treeflow": {
->       "command": "node",
->       "args": ["c:/Users/GOTHICS/Documents/vibe/treeflow/mcp-server/dist/index.js"],
->       "env": {
->         "TREEFLOW_URL": "http://localhost:8000",
->         "TREEFLOW_API_KEY": "tf_live_tu_clave_secreta_aqui",
->         "TREEFLOW_WORKSPACE_ID": "botsmexico"
->       }
->     }
->   }
-> }
-> ```
+> **Nota:** Si tu Treeflow está en un servidor o dominio propio (ej. `https://app.midominio.com`), cambia `"TREEFLOW_URL"` por la URL de tu instancia.
 
 ---
 
-## 🛠️ Catálogo de Herramientas (Tools) Disponibles
-
-### Gestión de Bots (Árboles)
-| Herramienta | Descripción |
-| :--- | :--- |
-| `treeflow_list_trees` | Lista todos los bots del workspace |
-| `treeflow_get_tree` | Obtiene la configuración detallada de un bot |
-| `treeflow_create_tree` | Crea un nuevo bot (nombre, rubro, idioma) |
-| `treeflow_update_tree` | Actualiza configuraciones y modos del bot |
-| `treeflow_delete_tree` | Elimina un bot permanentemente |
-
-### Canvas & Flujos (Branches y Leafs)
-| Herramienta | Descripción |
-| :--- | :--- |
-| `treeflow_list_branches` | Lista las ramas de un bot |
-| `treeflow_create_branch` | Crea una nueva rama de flujo en el canvas |
-| `treeflow_update_branch` | Modifica el nombre o descripción de una rama |
-| `treeflow_delete_branch` | Elimina una rama |
-| `treeflow_list_leafs` | Lista todos los nodos dentro de una rama |
-| `treeflow_create_leaf` | Crea un nodo (`message`, `input`, `condition`, `action`, `webhook`) |
-| `treeflow_update_leaf` | Modifica la configuración de un nodo |
-| `treeflow_delete_leaf` | Elimina un nodo del canvas |
-
-### NLU & Entrenamiento
-| Herramienta | Descripción |
-| :--- | :--- |
-| `treeflow_list_intents` | Lista las intenciones y frases de entrenamiento |
-| `treeflow_create_intent` | Crea una intención con frases de entrenamiento |
-| `treeflow_update_intent` | Actualiza una intención existente |
-| `treeflow_delete_intent` | Elimina una intención |
-| `treeflow_list_entities` | Lista las entidades y sinónimos |
-| `treeflow_create_entity` | Crea una entidad con sus valores y sinónimos |
-| `treeflow_update_entity` | Actualiza valores y sinónimos |
-| `treeflow_delete_entity` | Elimina una entidad |
-| `treeflow_trigger_training` | Lanza el re-entrenamiento del modelo de Machine Learning |
-| `treeflow_get_training_status` | Consulta el estado del entrenamiento |
-
-### Plantillas y Simulación
-| Herramienta | Descripción |
-| :--- | :--- |
-| `treeflow_list_message_templates` | Lista las plantillas de respuesta |
-| `treeflow_create_message_template` | Crea una plantilla de respuesta con variaciones |
-| `treeflow_update_message_template` | Modifica una plantilla |
-| `treeflow_delete_message_template` | Elimina una plantilla |
-| `treeflow_simulate_message` | Envía un mensaje de prueba para evaluar la detección del bot |
-| `treeflow_list_conversations` | Lista las conversaciones recientes del bot |
+### Paso 3: Reinicia Claude Desktop y ¡listo!
+Cierra y vuelve a abrir Claude Desktop. Verás el icono del martillo 🛠️ indicando que Treeflow está conectado.
 
 ---
 
-## 💻 Desarrollo Local
+## 💬 Ejemplos de lo que puedes pedirle a Claude
 
-```bash
-cd mcp-server
-npm install
-npm run build
-npm start
-```
+* *"Lista los bots disponibles en mi workspace de Treeflow."*
+* *"Crea un nuevo bot para un restaurante italiano con propósito 'restaurante' en idioma español."*
+* *"Agrega una intención llamada 'reservar_mesa' con 5 frases de entrenamiento y lánzale un entrenamiento."*
+* *"En el bot de Ventas, crea una rama en el canvas llamada 'Bienvenida' y añade un nodo de mensaje de saludo."*
+* *"Simula un mensaje de prueba que diga '¿Tienen mesas disponibles para hoy?' y dime qué intención detectó."*
 
 ---
 
-## 📄 Licencia
-MIT
+## 🛠️ ¿Qué puede hacer Claude con este servidor MCP?
+
+| Módulo | Acciones que Claude puede realizar |
+| :--- | :--- |
+| **🤖 Bots (Árboles)** | Listar, crear, inspeccionar, actualizar y eliminar bots. |
+| **🌿 Canvas de Flujos** | Crear ramas (*Branches*), agregar nodos (*Leafs* de mensajes, inputs, condiciones, webhooks) y organizar el lienzo. |
+| **🧠 NLU & Entrenamiento** | Crear intenciones con frases de entrenamiento, definir entidades con sinónimos y disparar entrenamientos del modelo. |
+| **💬 Respuestas** | Crear y editar plantillas de mensajes y respuestas dinámicas. |
+| **⚡ Diagnóstico & Pruebas** | Simular conversaciones en tiempo real y ver resultados de detección. |
