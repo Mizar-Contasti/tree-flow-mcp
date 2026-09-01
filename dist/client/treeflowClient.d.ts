@@ -18,31 +18,33 @@ export declare class TreeflowClient {
         primary_language?: string;
     }): Promise<any>;
     updateTree(treeId: string, data: Record<string, any>): Promise<any>;
-    deleteTree(treeId: string): Promise<any>;
     listBranches(treeId: string): Promise<any>;
     createBranch(treeId: string, data: {
         name: string;
         description?: string;
-        canvas_position?: any;
+        is_default?: boolean;
     }): Promise<any>;
-    updateBranch(treeId: string, branchId: string, data: {
+    getBranch(branchId: string): Promise<any>;
+    updateBranch(branchId: string, data: {
         name?: string;
         description?: string;
-        canvas_position?: any;
+        is_default?: boolean;
     }): Promise<any>;
-    deleteBranch(treeId: string, branchId: string): Promise<any>;
+    deleteBranch(branchId: string): Promise<any>;
     listLeafs(branchId: string): Promise<any>;
     createLeaf(branchId: string, data: {
         name?: string;
-        leaf_type: string;
-        canvas_position?: any;
+        type: string;
+        position_x?: number;
+        position_y?: number;
         config?: any;
         is_start?: boolean;
     }): Promise<any>;
     updateLeaf(leafId: string, data: {
         name?: string;
-        leaf_type?: string;
-        canvas_position?: any;
+        type?: string;
+        position_x?: number;
+        position_y?: number;
         config?: any;
         is_start?: boolean;
     }): Promise<any>;
@@ -109,7 +111,7 @@ export declare class TreeflowClient {
     createBackup(treeId: string, note?: string): Promise<any>;
     listUsers(): Promise<any>;
     createUser(data: {
-        username: string;
+        username?: string;
         email: string;
         role: string;
         name?: string;
@@ -118,6 +120,5 @@ export declare class TreeflowClient {
         role?: string;
         is_active?: boolean;
     }): Promise<any>;
-    deleteUser(userId: string): Promise<any>;
     listCredentials(): Promise<any>;
 }

@@ -25,22 +25,25 @@ export function registerLeafTools(client) {
                 properties: {
                     branch_id: { type: 'string', description: 'ID de la rama' },
                     leaf_type: { type: 'string', description: 'Tipo de nodo: message, input, condition, action, webhook, trigger_context' },
+                    name: { type: 'string', description: 'Nombre del nodo. Si se omite se usa el tipo.' },
                     config: {
                         type: 'object',
                         description: 'Configuración JSON del nodo (ej. plantilla de mensaje, opciones, condiciones)',
                     },
-                    canvas_position: {
-                        type: 'object',
-                        description: 'Posición x, y en el lienzo { x: number, y: number }',
-                    },
+                    position_x: { type: 'number', description: 'Posición X en el lienzo (default 0)' },
+                    position_y: { type: 'number', description: 'Posición Y en el lienzo (default 0)' },
+                    is_start: { type: 'boolean', description: 'Marca el nodo como inicio de la rama' },
                 },
                 required: ['branch_id', 'leaf_type'],
             },
             handler: async (args) => {
                 const result = await client.createLeaf(args.branch_id, {
-                    leaf_type: args.leaf_type,
+                    name: args.name,
+                    type: args.leaf_type,
                     config: args.config || {},
-                    canvas_position: args.canvas_position,
+                    position_x: args.position_x,
+                    position_y: args.position_y,
+                    is_start: args.is_start,
                 });
                 return {
                     content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -54,15 +57,23 @@ export function registerLeafTools(client) {
                 type: 'object',
                 properties: {
                     leaf_id: { type: 'string', description: 'ID del nodo (leaf)' },
+                    name: { type: 'string', description: 'Nuevo nombre del nodo' },
+                    leaf_type: { type: 'string', description: 'Nuevo tipo de nodo' },
                     config: { type: 'object', description: 'Nueva configuración del nodo' },
-                    canvas_position: { type: 'object', description: 'Nueva posición { x, y }' },
+                    position_x: { type: 'number', description: 'Nueva posición X en el lienzo' },
+                    position_y: { type: 'number', description: 'Nueva posición Y en el lienzo' },
+                    is_start: { type: 'boolean', description: 'Marca el nodo como inicio de la rama' },
                 },
                 required: ['leaf_id'],
             },
             handler: async (args) => {
                 const result = await client.updateLeaf(args.leaf_id, {
+                    name: args.name,
+                    type: args.leaf_type,
                     config: args.config,
-                    canvas_position: args.canvas_position,
+                    position_x: args.position_x,
+                    position_y: args.position_y,
+                    is_start: args.is_start,
                 });
                 return {
                     content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

@@ -11,6 +11,7 @@ export declare function registerBranchTools(client: TreeflowClient): ({
             };
             name?: undefined;
             description?: undefined;
+            is_default?: undefined;
             branch_id?: undefined;
         };
         required: string[];
@@ -38,6 +39,10 @@ export declare function registerBranchTools(client: TreeflowClient): ({
                 description: string;
             };
             description: {
+                type: string;
+                description: string;
+            };
+            is_default: {
                 type: string;
                 description: string;
             };
@@ -49,6 +54,7 @@ export declare function registerBranchTools(client: TreeflowClient): ({
         tree_id: string;
         name: string;
         description?: string;
+        is_default?: boolean;
     }) => Promise<{
         content: {
             type: string;
@@ -61,10 +67,6 @@ export declare function registerBranchTools(client: TreeflowClient): ({
     inputSchema: {
         type: string;
         properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
             branch_id: {
                 type: string;
                 description: string;
@@ -77,14 +79,19 @@ export declare function registerBranchTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            is_default: {
+                type: string;
+                description: string;
+            };
+            tree_id?: undefined;
         };
         required: string[];
     };
     handler: (args: {
-        tree_id: string;
         branch_id: string;
         name?: string;
         description?: string;
+        is_default?: boolean;
     }) => Promise<{
         content: {
             type: string;
@@ -97,21 +104,18 @@ export declare function registerBranchTools(client: TreeflowClient): ({
     inputSchema: {
         type: string;
         properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
             branch_id: {
                 type: string;
                 description: string;
             };
+            tree_id?: undefined;
             name?: undefined;
             description?: undefined;
+            is_default?: undefined;
         };
         required: string[];
     };
     handler: (args: {
-        tree_id: string;
         branch_id: string;
     }) => Promise<{
         content: {

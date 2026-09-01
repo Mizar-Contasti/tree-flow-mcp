@@ -28,13 +28,15 @@ export function registerBranchTools(client: TreeflowClient) {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
           name: { type: 'string', description: 'Nombre de la rama (ej. Bienvenida, Reservas, FAQ)' },
           description: { type: 'string', description: 'Descripción opcional' },
+          is_default: { type: 'boolean', description: 'Marca la rama como flujo por defecto del bot' },
         },
         required: ['tree_id', 'name'],
       },
-      handler: async (args: { tree_id: string; name: string; description?: string }) => {
+      handler: async (args: { tree_id: string; name: string; description?: string; is_default?: boolean }) => {
         const result = await client.createBranch(args.tree_id, {
           name: args.name,
           description: args.description,
+          is_default: args.is_default,
         });
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -47,17 +49,18 @@ export function registerBranchTools(client: TreeflowClient) {
       inputSchema: {
         type: 'object',
         properties: {
-          tree_id: { type: 'string', description: 'ID del bot/árbol' },
           branch_id: { type: 'string', description: 'ID de la rama' },
           name: { type: 'string', description: 'Nuevo nombre' },
           description: { type: 'string', description: 'Nueva descripción' },
+          is_default: { type: 'boolean', description: 'Marca la rama como flujo por defecto del bot' },
         },
-        required: ['tree_id', 'branch_id'],
+        required: ['branch_id'],
       },
-      handler: async (args: { tree_id: string; branch_id: string; name?: string; description?: string }) => {
-        const result = await client.updateBranch(args.tree_id, args.branch_id, {
+      handler: async (args: { branch_id: string; name?: string; description?: string; is_default?: boolean }) => {
+        const result = await client.updateBranch(args.branch_id, {
           name: args.name,
           description: args.description,
+          is_default: args.is_default,
         });
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
@@ -70,13 +73,12 @@ export function registerBranchTools(client: TreeflowClient) {
       inputSchema: {
         type: 'object',
         properties: {
-          tree_id: { type: 'string', description: 'ID del bot/árbol' },
           branch_id: { type: 'string', description: 'ID de la rama a eliminar' },
         },
-        required: ['tree_id', 'branch_id'],
+        required: ['branch_id'],
       },
-      handler: async (args: { tree_id: string; branch_id: string }) => {
-        const result = await client.deleteBranch(args.tree_id, args.branch_id);
+      handler: async (args: { branch_id: string }) => {
+        const result = await client.deleteBranch(args.branch_id);
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };

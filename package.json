@@ -8,12 +8,14 @@
     "treeflow-mcp": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "scripts"
   ],
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "validate:routes": "node scripts/validate-routes.mjs"
   },
   "keywords": [
     "mcp",

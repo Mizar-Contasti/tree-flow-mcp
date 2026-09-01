@@ -21,13 +21,18 @@ export class TreeflowClient {
 
   // --- 1. TREES / BOTS ---
   async listTrees() {
-    const response = await this.client.get('/trees/');
+    const response = await this.client.get('/trees');
     return response.data;
   }
 
+  // El backend no expone GET /trees/{id}: se resuelve desde el listado del workspace.
   async getTree(treeId: string) {
-    const response = await this.client.get(`/trees/${treeId}`);
-    return response.data;
+    const trees = await this.listTrees();
+    const tree = (trees || []).find((t: any) => t.tree_id === treeId);
+    if (!tree) {
+      throw new Error(`No existe el árbol ${treeId} en el workspace ${this.workspaceId}.`);
+    }
+    return tree;
   }
 
   async getTreeData(treeId: string) {
@@ -48,10 +53,7 @@ export class TreeflowClient {
   }
 
   async createTree(data: { name: string; description?: string; purpose?: string; primary_language?: string }) {
-    const response = await this.client.post('/trees/', {
-      ...data,
-      workspace_id: this.workspaceId,
-    });
+    const response = await this.client.post('/trees', data);
     return response.data;
   }
 
@@ -60,50 +62,68 @@ export class TreeflowClient {
     return response.data;
   }
 
-  async deleteTree(treeId: string) {
-    const response = await this.client.delete(`/trees/${treeId}`);
-    return response.data;
-  }
-
   // --- 2. BRANCHES (Canvas Flujos) ---
   async listBranches(treeId: string) {
-    const response = await this.client.get(`/design/trees/${treeId}/branches`);
+    const response = await this.client.get(`/design/${treeId}/branches`);
     return response.data;
   }
 
-  async createBranch(treeId: string, data: { name: string; description?: string; canvas_position?: any }) {
-    const response = await this.client.post(`/design/trees/${treeId}/branches`, data);
+  async createBranch(treeId: string, data: { name: string; description?: string; is_default?: boolean }) {
+    const response = await this.client.post(`/design/${treeId}/branches`, data);
     return response.data;
   }
 
-  async updateBranch(treeId: string, branchId: string, data: { name?: string; description?: string; canvas_position?: any }) {
-    const response = await this.client.put(`/design/trees/${treeId}/branches/${branchId}`, data);
+  async getBranch(branchId: string) {
+    const response = await this.client.get(`/design/branches/${branchId}`);
     return response.data;
   }
 
-  async deleteBranch(treeId: string, branchId: string) {
-    const response = await this.client.delete(`/design/trees/${treeId}/branches/${branchId}`);
+  async updateBranch(branchId: string, data: { name?: string; description?: string; is_default?: boolean }) {
+    const response = await this.client.put(`/design/branches/${branchId}`, data);
+    return response.data;
+  }
+
+  async deleteBranch(branchId: string) {
+    const response = await this.client.delete(`/design/branches/${branchId}`);
     return response.data;
   }
 
   // --- 3. LEAFS (Nodos del Canvas) ---
+  // El backend no expone un listado propio: las leaves vienen embebidas en la rama.
   async listLeafs(branchId: string) {
-    const response = await this.client.get(`/design/branches/${branchId}/leafs`);
+    const branch = await this.getBranch(branchId);
+    return branch?.leaves ?? [];
+  }
+
+  async createLeaf(
+    branchId: string,
+    data: { name?: string; type: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean }
+  ) {
+    const response = await this.client.post(`/design/branches/${branchId}/leaves`, {
+      name: data.name || data.type,
+      type: data.type,
+      position_x: data.position_x ?? 0,
+      position_y: data.position_y ?? 0,
+      config: data.config ?? {},
+      ...(data.is_start !== undefined ? { is_start: data.is_start } : {}),
+    });
     return response.data;
   }
 
-  async createLeaf(branchId: string, data: { name?: string; leaf_type: string; canvas_position?: any; config?: any; is_start?: boolean }) {
-    const response = await this.client.post(`/design/branches/${branchId}/leafs`, data);
-    return response.data;
-  }
-
-  async updateLeaf(leafId: string, data: { name?: string; leaf_type?: string; canvas_position?: any; config?: any; is_start?: boolean }) {
-    const response = await this.client.put(`/design/leafs/${leafId}`, data);
+  async updateLeaf(
+    leafId: string,
+    data: { name?: string; type?: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean }
+  ) {
+    const body: Record<string, any> = {};
+    for (const key of ['name', 'type', 'position_x', 'position_y', 'config', 'is_start'] as const) {
+      if (data[key] !== undefined) body[key] = data[key];
+    }
+    const response = await this.client.put(`/design/leaves/${leafId}`, body);
     return response.data;
   }
 
   async deleteLeaf(leafId: string) {
-    const response = await this.client.delete(`/design/leafs/${leafId}`);
+    const response = await this.client.delete(`/design/leaves/${leafId}`);
     return response.data;
   }
 
@@ -151,22 +171,22 @@ export class TreeflowClient {
 
   // --- 6. MESSAGE TEMPLATES ---
   async listMessageTemplates(treeId: string) {
-    const response = await this.client.get(`/design/trees/${treeId}/templates`);
+    const response = await this.client.get(`/design/${treeId}/messages`);
     return response.data;
   }
 
   async createMessageTemplate(treeId: string, data: { name: string; text?: string; description?: string; responses?: any[] }) {
-    const response = await this.client.post(`/design/trees/${treeId}/templates`, data);
+    const response = await this.client.post(`/design/${treeId}/messages`, data);
     return response.data;
   }
 
   async updateMessageTemplate(templateId: string, data: { name?: string; text?: string; description?: string; responses?: any[] }) {
-    const response = await this.client.put(`/design/templates/${templateId}`, data);
+    const response = await this.client.put(`/design/messages/${templateId}`, data);
     return response.data;
   }
 
   async deleteMessageTemplate(templateId: string) {
-    const response = await this.client.delete(`/design/templates/${templateId}`);
+    const response = await this.client.delete(`/design/messages/${templateId}`);
     return response.data;
   }
 
@@ -176,39 +196,46 @@ export class TreeflowClient {
     return response.data;
   }
 
+  // El backend guarda la config completa vía POST (no hay PUT sobre la colección).
+  // FertilizerConfig exige tree_id y workspace_id en el cuerpo.
   async updateFertilizerConfig(treeId: string, data: any) {
-    const response = await this.client.put(`/api/fertilizers/${treeId}`, data);
+    const response = await this.client.post(`/api/fertilizers/${treeId}`, {
+      ...data,
+      tree_id: treeId,
+      workspace_id: this.workspaceId,
+    });
     return response.data;
   }
 
   // --- 8. INTEGRACIONES & CANALES (Injertos) ---
   async listIntegrations(treeId: string) {
-    const tree = await this.getTree(treeId);
+    const response = await this.client.get(`/bots/${treeId}/injertos`);
     return {
       tree_id: treeId,
-      injertos: tree.injertos || {},
+      injertos: response.data?.injertos ?? response.data ?? {},
     };
   }
 
   async configureIntegration(treeId: string, integrationKey: string, enabled: boolean, config?: any) {
-    const tree = await this.getTree(treeId);
-    const injertos = { ...(tree.injertos || {}) };
+    const current = await this.listIntegrations(treeId);
+    const injertos = { ...(current.injertos || {}) };
     injertos[integrationKey] = {
       ...(injertos[integrationKey] || {}),
       enabled,
       ...(config ? { config } : {}),
     };
-    return await this.updateTree(treeId, { injertos });
+    const response = await this.client.put(`/bots/${treeId}/injertos`, injertos);
+    return response.data;
   }
 
   // --- 9. VOZ (Voice STT/TTS) ---
   async getVoiceConfig(treeId: string) {
-    const response = await this.client.get(`/api/voice/config/${treeId}`);
+    const response = await this.client.get(`/bots/${treeId}/voice-config`);
     return response.data;
   }
 
   async updateVoiceConfig(treeId: string, data: Record<string, any>) {
-    const response = await this.client.post(`/api/voice/config/${treeId}`, data);
+    const response = await this.client.put(`/bots/${treeId}/voice-config`, data);
     return response.data;
   }
 
@@ -224,15 +251,15 @@ export class TreeflowClient {
   }
 
   async listTrainingHistory(treeId: string, page = 1, pageSize = 10) {
-    const response = await this.client.get(`/api/training-history/${treeId}`, {
-      params: { page, page_size: pageSize },
+    const response = await this.client.get('/api/training-history/', {
+      params: { tree_id: treeId, page, page_size: pageSize },
     });
     return response.data;
   }
 
   // --- 11. CONVERSACIONES & SIMULADOR ---
   async simulateChatMessage(treeId: string, message: string, sessionId?: string) {
-    const response = await this.client.post('/api/message', {
+    const response = await this.client.post('/message', {
       tree_id: treeId,
       message,
       session_id: sessionId || `mcp_sim_${Date.now()}`,
@@ -252,7 +279,7 @@ export class TreeflowClient {
 
   // --- 12. AUDITORÍA & CAMBIOS ---
   async listChangeHistory(treeId: string, limit = 50) {
-    const response = await this.client.get(`/api/change-history/${treeId}`, {
+    const response = await this.client.get(`/api/trees/${treeId}/history`, {
       params: { limit },
     });
     return response.data;
@@ -260,33 +287,34 @@ export class TreeflowClient {
 
   // --- 13. BACKUPS & RESTORE ---
   async listBackups(treeId: string) {
-    const response = await this.client.get(`/api/backup/${treeId}`);
+    const response = await this.client.get(`/api/backup/trees/${treeId}/backups`);
     return response.data;
   }
 
   async createBackup(treeId: string, note?: string) {
-    const response = await this.client.post(`/api/backup/${treeId}`, { note });
+    const response = await this.client.post(`/api/backup/trees/${treeId}/backups/create`, { note });
     return response.data;
   }
 
   // --- 14. USUARIOS DEL WORKSPACE ---
+  // El workspace sale del API Key: el backend filtra por el del portador.
   async listUsers() {
-    const response = await this.client.get(`/users/${this.workspaceId}`);
+    const response = await this.client.get('/users/');
     return response.data;
   }
 
-  async createUser(data: { username: string; email: string; role: string; name?: string }) {
-    const response = await this.client.post(`/users/${this.workspaceId}`, data);
+  async createUser(data: { username?: string; email: string; role: string; name?: string }) {
+    const response = await this.client.post('/users/', {
+      name: data.name || data.username,
+      email: data.email,
+      role: data.role,
+      workspace_id: this.workspaceId,
+    });
     return response.data;
   }
 
   async updateUser(userId: string, data: { role?: string; is_active?: boolean }) {
     const response = await this.client.put(`/users/${userId}`, data);
-    return response.data;
-  }
-
-  async deleteUser(userId: string) {
-    const response = await this.client.delete(`/users/${userId}`);
     return response.data;
   }
 

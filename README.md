@@ -37,7 +37,15 @@ Pega el siguiente bloque dentro de `"mcpServers"` (reemplaza `TREEFLOW_API_KEY` 
 }
 ```
 
-> **Nota:** Si tu Treeflow está en un servidor o dominio propio (ej. `https://app.midominio.com`), cambia `"TREEFLOW_URL"` por la URL de tu instancia.
+> **Nota:** Si tu Treeflow está en un servidor o dominio propio (ej. `https://api.midominio.com`), cambia `"TREEFLOW_URL"` por la URL de tu instancia.
+
+Las tres variables son **obligatorias**:
+
+| Variable | Qué es |
+|---|---|
+| `TREEFLOW_URL` | URL base de tu API de Treeflow (sin barra final). Default: `http://localhost:8000` |
+| `TREEFLOW_API_KEY` | La clave `tf_live_...` del Paso 1. El backend deriva de ella tu workspace y tu rol |
+| `TREEFLOW_WORKSPACE_ID` | El slug de tu workspace (el mismo con el que inicias sesión). Debe ser el dueño de la clave |
 
 ---
 
@@ -46,7 +54,7 @@ Cierra y vuelve a abrir Claude Desktop. Verás el icono del martillo 🛠️ ind
 
 ---
 
-## 🛠️ Catálogo Completo de Herramientas (47 Tools)
+## 🛠️ Catálogo Completo de Herramientas (45 Tools)
 
 A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupado por módulo:
 
@@ -56,15 +64,16 @@ A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupad
 * `treeflow_get_tree_data`: Obtiene la estructura COMPLETA del bot en un solo llamado (ramas, nodos, intenciones, entidades y plantillas).
 * `treeflow_create_tree`: Crea un nuevo bot con nombre, propósito (hotel, restaurante, clínica, etc.) e idioma principal.
 * `treeflow_update_tree`: Modifica parámetros avanzados de NLP, umbrales de confianza (ML / difuso), análisis de sentimiento y modos de operación.
-* `treeflow_delete_tree`: Elimina un bot permanentemente.
+
+> El borrado de bots y de usuarios **no** se expone como herramienta: son operaciones destructivas e irreversibles que deben hacerse desde el panel de Treeflow.
 
 ### 2. 🌿 Canvas & Flujos Visuales (Branches & Leafs)
 * `treeflow_list_branches`: Lista todas las ramas de conversación del canvas.
 * `treeflow_create_branch`: Crea una nueva rama y su nodo de inicio.
-* `treeflow_update_branch`: Modifica el nombre o descripción de una rama.
-* `treeflow_delete_branch`: Elimina una rama y todos sus nodos.
+* `treeflow_update_branch`: Modifica el nombre o descripción de una rama (sólo requiere `branch_id`).
+* `treeflow_delete_branch`: Elimina una rama y todos sus nodos (sólo requiere `branch_id`).
 * `treeflow_list_leafs`: Lista todos los nodos de una rama seleccionada.
-* `treeflow_create_leaf`: Crea un nodo en el lienzo (`message`, `trigger_context`, `intent`, `action`, `condition`, `webhook`) con su configuración y posición `(x, y)`.
+* `treeflow_create_leaf`: Crea un nodo en el lienzo (`message`, `trigger_context`, `intent`, `action`, `condition`, `webhook`) con su configuración y posición `position_x` / `position_y`.
 * `treeflow_update_leaf`: Modifica el contenido, posición o comportamiento de un nodo.
 * `treeflow_delete_leaf`: Elimina un nodo del canvas.
 
@@ -118,7 +127,6 @@ A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupad
 * `treeflow_list_users`: Lista los miembros y roles del workspace.
 * `treeflow_create_user`: Invita un nuevo usuario al workspace.
 * `treeflow_update_user`: Modifica rol o estado de un usuario.
-* `treeflow_delete_user`: Elimina un usuario del workspace.
 * `treeflow_list_credentials`: Verifica proveedores de IA activos (OpenAI, Gemini, Groq, Twilio, Meta).
 
 ---
@@ -131,3 +139,27 @@ A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupad
 * *"Activa la integración de WhatsApp y configura la voz TTS en español con velocidad 1.1."*
 * *"Simula una conversación enviando 'Hola quiero cancelar mi pedido' y dime qué intención detectó el bot."*
 * *"Crea un respaldo de seguridad del bot antes de que empecemos a modificar los flujos."*
+
+---
+
+## 🧪 Desarrollo: validación de rutas
+
+Cada llamada del cliente HTTP se valida contra el `openapi.json` real del backend, para que
+ninguna herramienta apunte a una ruta inexistente:
+
+```sh
+npm run build
+TREEFLOW_URL=https://api.tu-treeflow.com npm run validate:routes
+```
+
+El script (`scripts/validate-routes.mjs`) extrae todas las llamadas de
+`src/client/treeflowClient.ts`, las normaliza y las contrasta con las rutas y métodos que
+expone el backend. Sale con código `1` si alguna ruta no existe o si el método no coincide.
+También acepta un spec local:
+
+```sh
+node scripts/validate-routes.mjs --spec ./openapi.json
+```
+
+Córrelo antes de cada release y después de tocar el backend: es la red de seguridad contra
+el desfase entre el MCP y la API.

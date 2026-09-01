@@ -10,8 +10,11 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 description: string;
             };
             leaf_type?: undefined;
+            name?: undefined;
             config?: undefined;
-            canvas_position?: undefined;
+            position_x?: undefined;
+            position_y?: undefined;
+            is_start?: undefined;
             leaf_id?: undefined;
         };
         required: string[];
@@ -38,11 +41,23 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            name: {
+                type: string;
+                description: string;
+            };
             config: {
                 type: string;
                 description: string;
             };
-            canvas_position: {
+            position_x: {
+                type: string;
+                description: string;
+            };
+            position_y: {
+                type: string;
+                description: string;
+            };
+            is_start: {
                 type: string;
                 description: string;
             };
@@ -53,8 +68,11 @@ export declare function registerLeafTools(client: TreeflowClient): ({
     handler: (args: {
         branch_id: string;
         leaf_type: string;
+        name?: string;
         config?: any;
-        canvas_position?: any;
+        position_x?: number;
+        position_y?: number;
+        is_start?: boolean;
     }) => Promise<{
         content: {
             type: string;
@@ -68,6 +86,14 @@ export declare function registerLeafTools(client: TreeflowClient): ({
         type: string;
         properties: {
             leaf_id: {
+                type: string;
+                description: string;
+            };
+            name: {
+                type: string;
+                description: string;
+            };
+            leaf_type: {
                 type: string;
                 description: string;
             };
@@ -75,19 +101,30 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            canvas_position: {
+            position_x: {
+                type: string;
+                description: string;
+            };
+            position_y: {
+                type: string;
+                description: string;
+            };
+            is_start: {
                 type: string;
                 description: string;
             };
             branch_id?: undefined;
-            leaf_type?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         leaf_id: string;
+        name?: string;
+        leaf_type?: string;
         config?: any;
-        canvas_position?: any;
+        position_x?: number;
+        position_y?: number;
+        is_start?: boolean;
     }) => Promise<{
         content: {
             type: string;
@@ -106,8 +143,11 @@ export declare function registerLeafTools(client: TreeflowClient): ({
             };
             branch_id?: undefined;
             leaf_type?: undefined;
+            name?: undefined;
             config?: undefined;
-            canvas_position?: undefined;
+            position_x?: undefined;
+            position_y?: undefined;
+            is_start?: undefined;
         };
         required: string[];
     };
