@@ -297,12 +297,22 @@ export class TreeflowClient {
         return response.data;
     }
     // --- 13. BACKUPS & RESTORE ---
+    // Se usan los snapshots de la BD, no /backups: esos ultimos escriben un
+    // archivo en el disco local del servidor (ruta relativa, sin volumen ni
+    // endpoint de borrado) y no son los que muestra el panel.
     async listBackups(treeId) {
-        const response = await this.client.get(`/api/backup/trees/${treeId}/backups`);
+        const response = await this.client.get(`/api/backup/trees/${treeId}/snapshots`);
         return response.data;
     }
+    // El endpoint recibe los campos como formulario, no como JSON.
     async createBackup(treeId, note) {
-        const response = await this.client.post(`/api/backup/trees/${treeId}/backups/create`, { note });
+        const form = new URLSearchParams();
+        if (note)
+            form.append('label', note);
+        form.append('is_auto', 'false');
+        const response = await this.client.post(`/api/backup/trees/${treeId}/snapshots`, form, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
         return response.data;
     }
     // --- 14. USUARIOS DEL WORKSPACE ---
