@@ -21,6 +21,43 @@ import { registerDiagnosticTools } from './tools/diagnostics.js';
 import { registerHistoryTools } from './tools/history.js';
 import { registerUserTools } from './tools/users.js';
 
+// Reglas que ninguna descripción de herramienta puede transmitir por sí sola:
+// aplican al servicio completo y evitan los errores más caros (sobre todo
+// olvidar el reentrenamiento, que deja los cambios sin efecto en silencio).
+const INSTRUCTIONS = `Treeflow es una plataforma de chatbots NLU. Un "árbol" (tree) es un bot.
+
+DOS SUBSISTEMAS DISTINTOS, no los confundas:
+1. Canvas visual: Ramas (branches) son contenedores de flujo; Hojas (leafs) son
+   los nodos dentro de una rama (message, intent, trigger_context, condition...).
+   Al crear una rama se genera sola una hoja "Start".
+2. NLU: Intenciones (intents) tienen frases de entrenamiento; Entidades (entities)
+   tienen valores y sinónimos. Son los datos con los que se entrena el modelo.
+Ramas/Hojas NO son sinónimo de Intenciones/Entidades: conviven pero sirven a cosas
+distintas.
+
+REENTRENAMIENTO OBLIGATORIO: después de crear, modificar o borrar intenciones o
+entidades, llama a treeflow_trigger_training. Si no lo haces, el motor NLU sigue
+usando el modelo viejo y tus cambios no surten efecto, sin aviso ni error.
+Confirma con treeflow_get_training_status: can_use debe quedar en true.
+
+EXPLORAR: usa treeflow_get_tree_data para obtener la estructura completa de un bot
+(ramas, hojas, intenciones, entidades y plantillas) en una sola llamada, en vez de
+encadenar varios list.
+
+PATRONES: dentro de las frases de una intención, las entidades se referencian con
+arroba, por ejemplo "quiero una @tipo_habitacion".
+
+ACTUALIZACIONES: en update sólo hace falta mandar el campo que cambia; el resto se
+conserva.
+
+WORKSPACE: sale del API Key. No le pidas al usuario un workspace ni un ID de
+workspace.
+
+ANTES DE CAMBIOS GRANDES: treeflow_create_backup deja un snapshot restaurable.
+
+BORRADOS: eliminar bots o usuarios no está disponible a propósito, por ser
+irreversible. Si el usuario lo pide, dile que lo haga desde el panel de Treeflow.`;
+
 async function main() {
   const client = new TreeflowClient();
 
@@ -33,6 +70,7 @@ async function main() {
       capabilities: {
         tools: {},
       },
+      instructions: INSTRUCTIONS,
     }
   );
 
