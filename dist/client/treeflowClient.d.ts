@@ -1,3 +1,37 @@
+export interface ToolVariableInput {
+    name: string;
+    type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
+    description?: string;
+    jsonPath?: string;
+    testValue?: string;
+    fallbackValue?: string;
+}
+export interface ToolInput {
+    name?: string;
+    description?: string;
+    url?: string;
+    method?: 'POST' | 'GET' | 'PATCH' | 'DELETE' | 'PUT' | 'QUERY';
+    timeout?: number;
+    body?: string;
+    authType?: 'none' | 'basic' | 'bearer' | 'apiKey';
+    authConfig?: Record<string, any>;
+    inputVariables?: ToolVariableInput[];
+    outputVariables?: ToolVariableInput[];
+    enabled?: boolean;
+    errorMessage?: Record<string, string>;
+}
+export interface ScriptInput {
+    name?: string;
+    description?: string;
+    language?: 'python' | 'node' | 'javascript';
+    code?: string;
+    timeout?: number;
+    inputVariables?: ToolVariableInput[];
+    outputVariables?: ToolVariableInput[];
+    enabled?: boolean;
+    errorMessage?: Record<string, string>;
+}
+export declare function maskSecrets<T>(value: T): T;
 export declare class TreeflowClient {
     private client;
     workspaceId: string;
@@ -95,6 +129,96 @@ export declare class TreeflowClient {
     deleteMessageTemplate(templateId: string): Promise<any>;
     listFertilizers(treeId: string): Promise<any>;
     updateFertilizerConfig(treeId: string, data: any): Promise<any>;
+    private loadFertilizerConfig;
+    private saveFertilizerConfig;
+    private pickById;
+    createTool(treeId: string, input: ToolInput & {
+        name: string;
+        url: string;
+    }): Promise<any>;
+    updateTool(treeId: string, toolId: string, patch: ToolInput & {
+        status?: string;
+    }): Promise<any>;
+    deleteTool(treeId: string, toolId: string): Promise<{
+        deleted: any;
+        name: any;
+    }>;
+    /** Prueba la herramienta guardada con el mismo ejecutor que usa la conversación. */
+    testTool(treeId: string, toolId: string, testValues?: Record<string, string>): Promise<any>;
+    createScript(treeId: string, input: ScriptInput & {
+        name: string;
+        code: string;
+    }): Promise<any>;
+    updateScript(treeId: string, scriptId: string, patch: ScriptInput & {
+        status?: string;
+    }): Promise<any>;
+    deleteScript(treeId: string, scriptId: string): Promise<{
+        deleted: any;
+        name: any;
+    }>;
+    /** Ejecuta el script guardado en caliente. */
+    testScript(treeId: string, scriptId: string, testValues?: Record<string, string>): Promise<any>;
+    listToolLogs(treeId: string, params?: {
+        limit?: number;
+        offset?: number;
+        success?: boolean;
+        tool_name?: string;
+        search?: string;
+        date_from?: string;
+        date_to?: string;
+    }): Promise<any>;
+    listCaptures(treeId: string): Promise<any>;
+    getCapture(treeId: string, ref: string): Promise<any>;
+    createCapture(treeId: string, data: Record<string, any>): Promise<any>;
+    updateCapture(treeId: string, ref: string, patch: Record<string, any>): Promise<any>;
+    deleteCapture(treeId: string, ref: string): Promise<any>;
+    listTransfers(treeId: string): Promise<any>;
+    createTransfer(treeId: string, data: Record<string, any>): Promise<any>;
+    updateTransfer(treeId: string, configId: string, patch: Record<string, any>): Promise<any>;
+    deleteTransfer(treeId: string, configId: string): Promise<any>;
+    testTransfer(treeId: string, configId: string, data?: Record<string, any>): Promise<any>;
+    getLiveChatQueue(treeId?: string): Promise<any>;
+    getLiveChatHistory(params?: {
+        tree_id?: string;
+        desde?: string;
+        hasta?: string;
+        estado?: string;
+        q?: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<any>;
+    getLiveChatSession(sessionId: string): Promise<any>;
+    listTestSuites(treeId: string): Promise<any>;
+    createTestSuite(treeId: string, data: {
+        name: string;
+        description?: string;
+        cases?: any[];
+    }): Promise<any>;
+    getTestSuite(suiteId: string): Promise<any>;
+    updateTestSuite(suiteId: string, data: {
+        name?: string;
+        description?: string;
+        cases?: any[];
+    }): Promise<any>;
+    deleteTestSuite(suiteId: string): Promise<any>;
+    importTestSuiteCsv(suiteId: string, csv: string, modo?: 'reemplazar' | 'agregar'): Promise<any>;
+    exportTestSuiteCsv(suiteId: string): Promise<string>;
+    runTestSuite(suiteId: string): Promise<any>;
+    listTestRuns(suiteId: string, limit?: number): Promise<any>;
+    getTestRun(runId: string): Promise<any>;
+    compareTestRuns(runId: string, otherRunId: string): Promise<any>;
+    getConversationAnalytics(treeId: string, params?: {
+        start_date?: number;
+        end_date?: number;
+        intent?: string;
+        branch?: string;
+        include_console?: boolean;
+        max_depth?: number;
+    }): Promise<any>;
+    exportTree(treeId: string, includeConversations?: boolean): Promise<any>;
+    /** Crea un árbol NUEVO a partir de un export; no toca el existente. */
+    importTree(backup: Record<string, any>, options?: Record<string, any>): Promise<any>;
+    restoreSnapshot(treeId: string, snapshotId: string): Promise<any>;
     listIntegrations(treeId: string): Promise<{
         tree_id: string;
         injertos: any;

@@ -20,6 +20,11 @@ import { registerTrainingTools } from './tools/training.js';
 import { registerDiagnosticTools } from './tools/diagnostics.js';
 import { registerHistoryTools } from './tools/history.js';
 import { registerUserTools } from './tools/users.js';
+import { registerCaptureTools } from './tools/captures.js';
+import { registerTransferTools } from './tools/transfers.js';
+import { registerSuiteTools } from './tools/suites.js';
+import { registerLiveChatTools } from './tools/livechat.js';
+import { registerBackupTools } from './tools/backups.js';
 
 // Reglas que ninguna descripción de herramienta puede transmitir por sí sola:
 // aplican al servicio completo y evitan los errores más caros (sobre todo
@@ -55,6 +60,30 @@ workspace.
 
 ANTES DE CAMBIOS GRANDES: treeflow_create_backup deja un snapshot restaurable.
 
+HERRAMIENTAS Y PLANTILLAS: el bot puede decir cosas con huecos. Hay UNA sola sintaxis:
+{ ... }, y dentro el $ distingue una variable de un texto. {$nombre} es la variable
+nombre; {nombre} es la palabra "nombre". Condiciones: {$edad > 18 ? "adulto" : "menor"}.
+La sintaxis {{ }} ya NO existe: un texto con ella no falla, imprime otra cosa
+({{$x}} sale como "{Ana}"). Vale para mensajes, preguntas de captura, y la URL y el
+cuerpo de las herramientas.
+ - Una herramienta API (treeflow_create_tool) se guarda con campos planos (url,
+   method, body, authType, inputVariables, outputVariables…). Tras crearla o
+   cambiarla, pruébala con treeflow_test_tool: llama de verdad a la URL y devuelve
+   estado ok / sin_datos / error. Los scripts igual (treeflow_test_script).
+ - Los nombres de herramientas y scripts son únicos por bot.
+ - Contraseñas y tokens salen enmascarados (***) al listar: es normal, los valores
+   reales siguen guardados y no se pierden al actualizar.
+ - Las capturas son preguntas reutilizables del slot filling: cambiar una afecta a
+   todos los parámetros que la usan, y surte efecto sin reentrenar.
+ - Tras cambios de lógica, treeflow_run_test_suite detecta regresiones, y
+   treeflow_compare_test_runs dice qué cambió entre dos ejecuciones.
+
+RESTAURAR: treeflow_restore_snapshot sobrescribe el bot. Exige confirmación explícita
+del usuario y crea antes un snapshot de seguridad.
+
+MESA DE AYUDA: las herramientas de chat en vivo son sólo de lectura. Tomar, responder
+o cerrar una atención se hace desde la mesa de ayuda de Treeflow.
+
 BORRADOS: eliminar bots o usuarios no está disponible a propósito, por ser
 irreversible. Si el usuario lo pide, dile que lo haga desde el panel de Treeflow.`;
 
@@ -64,7 +93,7 @@ async function main() {
   const server = new Server(
     {
       name: 'treeflow-mcp',
-      version: '1.0.0',
+      version: '1.1.0',
     },
     {
       capabilities: {
@@ -89,6 +118,11 @@ async function main() {
     ...registerDiagnosticTools(client),
     ...registerHistoryTools(client),
     ...registerUserTools(client),
+    ...registerCaptureTools(client),
+    ...registerTransferTools(client),
+    ...registerSuiteTools(client),
+    ...registerLiveChatTools(client),
+    ...registerBackupTools(client),
   ];
 
   const toolsMap = new Map<string, (args: any) => Promise<any>>();

@@ -19,6 +19,40 @@ function normalizeEntityValues(values) {
         ...(v?.entity ? { entity: v.entity } : {}),
     }));
 }
+function toVariables(vars) {
+    return (vars || []).map((v) => ({
+        id: randomUUID(),
+        name: v.name,
+        type: v.type ?? 'string',
+        description: v.description ?? '',
+        jsonPath: v.jsonPath ?? '',
+        ...(v.testValue !== undefined ? { testValue: v.testValue } : {}),
+        ...(v.fallbackValue !== undefined ? { fallbackValue: v.fallbackValue } : {}),
+    }));
+}
+// Oculta secretos en lo que se devuelve al modelo. Los valores reales siguen en el
+// servidor y las actualizaciones los conservan: se parte siempre de la config guardada.
+const MASK = '***';
+export function maskSecrets(value) {
+    const secretKeys = new Set(['password', 'token', 'secretPhrase', 'auth_token', 'api_key', 'apiKey']);
+    const walk = (v, key) => {
+        if (Array.isArray(v))
+            return v.map((x) => walk(x));
+        if (v && typeof v === 'object') {
+            const out = {};
+            for (const [k, x] of Object.entries(v))
+                out[k] = walk(x, k);
+            // authConfig.value guarda la clave de una API de tipo apiKey
+            if ('key' in out && 'value' in out && v.value)
+                out.value = MASK;
+            return out;
+        }
+        if (key && secretKeys.has(key) && typeof v === 'string' && v)
+            return MASK;
+        return v;
+    };
+    return walk(value);
+}
 export class TreeflowClient {
     client;
     workspaceId;
@@ -224,6 +258,318 @@ export class TreeflowClient {
             tree_id: treeId,
             workspace_id: this.workspaceId,
         });
+        return response.data;
+    }
+    // Config guardada lista para volver a enviarse: las tools y scripts van en las
+    // claves que el backend lee (`additionalFertilizers` y `scripts`).
+    async loadFertilizerConfig(treeId) {
+        const current = await this.listFertilizers(treeId);
+        const { custom_scripts: _legacy, ...rest } = current || {};
+        return {
+            ...rest,
+            additionalFertilizers: [...(current?.additionalFertilizers || current?.additional_tools || [])],
+            scripts: [...(current?.scripts || current?.custom_scripts || [])],
+        };
+    }
+    saveFertilizerConfig(treeId, config) {
+        return this.updateFertilizerConfig(treeId, config);
+    }
+    pickById(list, idOrName) {
+        return list.find((x) => x.id === idOrName) || list.find((x) => x.name === idOrName);
+    }
+    async createTool(treeId, input) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const tool = {
+            id: randomUUID(),
+            name: input.name,
+            description: input.description ?? '',
+            url: input.url,
+            method: input.method ?? 'POST',
+            timeout: input.timeout ?? 30000,
+            body: input.body ?? '{}',
+            authType: input.authType ?? 'none',
+            authConfig: input.authConfig ?? {},
+            inputVariables: toVariables(input.inputVariables),
+            outputVariables: toVariables(input.outputVariables),
+            lastResponse: '',
+            enabled: input.enabled ?? true,
+            status: 'unconfigured',
+            deployedDate: null,
+            ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+        };
+        config.additionalFertilizers.push(tool);
+        await this.saveFertilizerConfig(treeId, config);
+        // El backend sanea el nombre (únicos, sin espacios): se relee para devolver el real.
+        const saved = await this.loadFertilizerConfig(treeId);
+        return saved.additionalFertilizers.find((t) => t.id === tool.id) ?? tool;
+    }
+    async updateTool(treeId, toolId, patch) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const tool = this.pickById(config.additionalFertilizers, toolId);
+        if (!tool)
+            throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
+        const { inputVariables, outputVariables, authConfig, ...simple } = patch;
+        Object.assign(tool, pickDefined(simple));
+        if (authConfig !== undefined)
+            tool.authConfig = { ...(tool.authConfig || {}), ...authConfig };
+        if (inputVariables !== undefined)
+            tool.inputVariables = toVariables(inputVariables);
+        if (outputVariables !== undefined)
+            tool.outputVariables = toVariables(outputVariables);
+        // Cualquier cambio invalida la validación anterior, como en el editor de la app.
+        if (patch.status === undefined)
+            tool.status = 'unconfigured';
+        await this.saveFertilizerConfig(treeId, config);
+        const saved = await this.loadFertilizerConfig(treeId);
+        return saved.additionalFertilizers.find((t) => t.id === tool.id) ?? tool;
+    }
+    async deleteTool(treeId, toolId) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const tool = this.pickById(config.additionalFertilizers, toolId);
+        if (!tool)
+            throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
+        config.additionalFertilizers = config.additionalFertilizers.filter((t) => t.id !== tool.id);
+        await this.saveFertilizerConfig(treeId, config);
+        return { deleted: tool.id, name: tool.name };
+    }
+    /** Prueba la herramienta guardada con el mismo ejecutor que usa la conversación. */
+    async testTool(treeId, toolId, testValues) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const tool = this.pickById(config.additionalFertilizers, toolId);
+        if (!tool)
+            throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
+        const toTest = {
+            ...tool,
+            inputVariables: (tool.inputVariables || []).map((v) => ({
+                ...v,
+                ...(testValues && testValues[v.name] !== undefined ? { testValue: testValues[v.name] } : {}),
+            })),
+        };
+        const response = await this.client.post(`/api/fertilizers/${treeId}/tools/test`, { tool: toTest });
+        return response.data;
+    }
+    async createScript(treeId, input) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const script = {
+            id: randomUUID(),
+            name: input.name,
+            description: input.description ?? '',
+            language: input.language ?? 'python',
+            code: input.code,
+            timeout: input.timeout ?? 5000,
+            inputVariables: toVariables(input.inputVariables),
+            outputVariables: toVariables(input.outputVariables),
+            status: 'unconfigured',
+            deployedDate: null,
+            lastResponse: '',
+            enabled: input.enabled ?? true,
+            ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+        };
+        config.scripts.push(script);
+        await this.saveFertilizerConfig(treeId, config);
+        const saved = await this.loadFertilizerConfig(treeId);
+        return saved.scripts.find((x) => x.id === script.id) ?? script;
+    }
+    async updateScript(treeId, scriptId, patch) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const script = this.pickById(config.scripts, scriptId);
+        if (!script)
+            throw new Error(`No existe el script "${scriptId}" en el bot ${treeId}.`);
+        const { inputVariables, outputVariables, ...simple } = patch;
+        Object.assign(script, pickDefined(simple));
+        if (inputVariables !== undefined)
+            script.inputVariables = toVariables(inputVariables);
+        if (outputVariables !== undefined)
+            script.outputVariables = toVariables(outputVariables);
+        if (patch.status === undefined)
+            script.status = 'unconfigured';
+        await this.saveFertilizerConfig(treeId, config);
+        const saved = await this.loadFertilizerConfig(treeId);
+        return saved.scripts.find((x) => x.id === script.id) ?? script;
+    }
+    async deleteScript(treeId, scriptId) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const script = this.pickById(config.scripts, scriptId);
+        if (!script)
+            throw new Error(`No existe el script "${scriptId}" en el bot ${treeId}.`);
+        config.scripts = config.scripts.filter((x) => x.id !== script.id);
+        await this.saveFertilizerConfig(treeId, config);
+        return { deleted: script.id, name: script.name };
+    }
+    /** Ejecuta el script guardado en caliente. */
+    async testScript(treeId, scriptId, testValues) {
+        const config = await this.loadFertilizerConfig(treeId);
+        const script = this.pickById(config.scripts, scriptId);
+        if (!script)
+            throw new Error(`No existe el script "${scriptId}" en el bot ${treeId}.`);
+        const response = await this.client.post(`/api/fertilizers/${treeId}/scripts/test`, {
+            name: script.name,
+            language: script.language,
+            code: script.code,
+            timeout: script.timeout || 5000,
+            inputVariables: (script.inputVariables || []).map((v) => ({
+                ...v,
+                ...(testValues && testValues[v.name] !== undefined ? { testValue: testValues[v.name] } : {}),
+            })),
+            outputVariables: script.outputVariables || [],
+            sessionParams: {},
+        });
+        return response.data;
+    }
+    async listToolLogs(treeId, params = {}) {
+        const response = await this.client.get(`/api/fertilizers/${treeId}/tool-logs`, { params: pickDefined(params) });
+        return response.data;
+    }
+    // --- 7b. CAPTURAS (preguntas reutilizables del slot filling) ---
+    async listCaptures(treeId) {
+        const response = await this.client.get(`/trees/${treeId}/captures`);
+        return response.data;
+    }
+    async getCapture(treeId, ref) {
+        const response = await this.client.get(`/trees/${treeId}/captures/${encodeURIComponent(ref)}`);
+        return response.data;
+    }
+    async createCapture(treeId, data) {
+        const response = await this.client.post(`/trees/${treeId}/captures`, data);
+        return response.data;
+    }
+    // El PUT del backend sustituye la captura entera: se parte de la guardada y se
+    // aplica sólo lo que cambia, para no borrar campos que el usuario no mencionó.
+    async updateCapture(treeId, ref, patch) {
+        const current = await this.getCapture(treeId, ref);
+        const keep = [
+            'name', 'prompt', 'prompt_rich', 'prompt_blocks', 'prompt_responses', 'prompt_template_id',
+            'fallback', 'fallback_rich', 'fallback_blocks', 'fallback_responses', 'fallback_template_id',
+            'limit', 'on_limit_action',
+        ];
+        const base = {};
+        for (const k of keep)
+            if (current?.[k] !== undefined)
+                base[k] = current[k];
+        const response = await this.client.put(`/trees/${treeId}/captures/${encodeURIComponent(ref)}`, { ...base, ...pickDefined(patch) });
+        return response.data;
+    }
+    async deleteCapture(treeId, ref) {
+        const response = await this.client.delete(`/trees/${treeId}/captures/${encodeURIComponent(ref)}`);
+        return response.data;
+    }
+    // --- 7c. TRANSFERENCIA A HUMANO ---
+    async listTransfers(treeId) {
+        const response = await this.client.get(`/api/integrations/transfers/${treeId}`);
+        return response.data;
+    }
+    async createTransfer(treeId, data) {
+        const response = await this.client.post(`/api/integrations/transfers/${treeId}`, data);
+        return response.data;
+    }
+    // Igual que las capturas: el PUT exige el cuerpo completo (el nombre es obligatorio).
+    async updateTransfer(treeId, configId, patch) {
+        const current = await this.client.get(`/api/integrations/transfers/${treeId}/${configId}`).then((r) => r.data);
+        const keep = [
+            'name', 'description', 'endpoint_url', 'auth_token', 'custom_headers', 'include_history',
+            'history_format', 'agent_stops_listening', 'persist_widget_chat', 'transfer_message', 'is_active',
+        ];
+        const base = {};
+        for (const k of keep)
+            if (current?.[k] !== undefined && current?.[k] !== null)
+                base[k] = current[k];
+        const response = await this.client.put(`/api/integrations/transfers/${treeId}/${configId}`, { ...base, ...pickDefined(patch) });
+        return response.data;
+    }
+    async deleteTransfer(treeId, configId) {
+        const response = await this.client.delete(`/api/integrations/transfers/${treeId}/${configId}`);
+        return response.data;
+    }
+    async testTransfer(treeId, configId, data = {}) {
+        const response = await this.client.post(`/api/integrations/transfers/${treeId}/${configId}/test`, data);
+        return response.data;
+    }
+    // --- 7d. MESA DE AYUDA (chat en vivo): sólo lectura ---
+    // Responder, tomar o cerrar una atención es actuar como operador frente a un
+    // cliente real: eso se hace desde la mesa de ayuda, no desde un asistente.
+    async getLiveChatQueue(treeId) {
+        const response = await this.client.get('/api/live-chat/queue', { params: pickDefined({ tree_id: treeId }) });
+        return response.data;
+    }
+    async getLiveChatHistory(params = {}) {
+        const response = await this.client.get('/api/live-chat/history', { params: pickDefined(params) });
+        return response.data;
+    }
+    async getLiveChatSession(sessionId) {
+        const response = await this.client.get(`/api/live-chat/sessions/${sessionId}`);
+        return response.data;
+    }
+    // --- 7e. SUITES DE PRUEBA DEL BOT ---
+    async listTestSuites(treeId) {
+        const response = await this.client.get(`/trees/${treeId}/test-suites`);
+        return response.data;
+    }
+    async createTestSuite(treeId, data) {
+        const response = await this.client.post(`/trees/${treeId}/test-suites`, data);
+        return response.data;
+    }
+    async getTestSuite(suiteId) {
+        const response = await this.client.get(`/test-suites/${suiteId}`);
+        return response.data;
+    }
+    async updateTestSuite(suiteId, data) {
+        const response = await this.client.put(`/test-suites/${suiteId}`, data);
+        return response.data;
+    }
+    async deleteTestSuite(suiteId) {
+        const response = await this.client.delete(`/test-suites/${suiteId}`);
+        return response.data;
+    }
+    async importTestSuiteCsv(suiteId, csv, modo = 'reemplazar') {
+        const response = await this.client.post(`/test-suites/${suiteId}/import-csv`, { csv, modo });
+        return response.data;
+    }
+    async exportTestSuiteCsv(suiteId) {
+        const response = await this.client.get(`/test-suites/${suiteId}/export-csv`, { responseType: 'text' });
+        return response.data;
+    }
+    async runTestSuite(suiteId) {
+        const response = await this.client.post(`/test-suites/${suiteId}/run`);
+        return response.data;
+    }
+    async listTestRuns(suiteId, limit = 20) {
+        const response = await this.client.get(`/test-suites/${suiteId}/runs`, { params: { limit } });
+        return response.data;
+    }
+    async getTestRun(runId) {
+        const response = await this.client.get(`/test-runs/${runId}`);
+        return response.data;
+    }
+    async compareTestRuns(runId, otherRunId) {
+        const response = await this.client.get(`/test-runs/${runId}/compare/${otherRunId}`);
+        return response.data;
+    }
+    // --- 7f. ANALÍTICAS DE CONVERSACIONES ---
+    async getConversationAnalytics(treeId, params = {}) {
+        const response = await this.client.get(`/api/trees/${treeId}/conversations/analytics`, { params: pickDefined(params) });
+        return response.data;
+    }
+    // --- 7g. EXPORTAR / IMPORTAR / RESTAURAR ---
+    async exportTree(treeId, includeConversations = false) {
+        const response = await this.client.get(`/api/backup/trees/${treeId}/export`, {
+            params: { include_conversations: includeConversations },
+        });
+        return response.data;
+    }
+    /** Crea un árbol NUEVO a partir de un export; no toca el existente. */
+    async importTree(backup, options) {
+        const form = new FormData();
+        form.append('file', new Blob([JSON.stringify(backup)], { type: 'application/json' }), 'treeflow_backup.json');
+        if (options)
+            form.append('options', JSON.stringify(options));
+        const response = await this.client.post('/api/backup/trees/import', form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            maxBodyLength: Infinity,
+        });
+        return response.data;
+    }
+    async restoreSnapshot(treeId, snapshotId) {
+        const response = await this.client.post(`/api/backup/trees/${treeId}/snapshots/${snapshotId}/restore`);
         return response.data;
     }
     // --- 8. INTEGRACIONES & CANALES (Injertos) ---

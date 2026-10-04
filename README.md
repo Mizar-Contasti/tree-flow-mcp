@@ -54,7 +54,7 @@ Cierra y vuelve a abrir Claude Desktop. Verás el icono del martillo 🛠️ ind
 
 ---
 
-## 🛠️ Catálogo Completo de Herramientas (45 Tools)
+## 🛠️ Catálogo Completo de Herramientas (80 Tools)
 
 A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupado por módulo:
 
@@ -95,10 +95,38 @@ A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupad
 * `treeflow_update_message_template`: Actualiza una plantilla existente.
 * `treeflow_delete_message_template`: Elimina una plantilla.
 
-### 6. 🧪 Fertilizantes & Knowledge Base (RAG)
-* `treeflow_list_fertilizers`: Lista herramientas adicionales, scripts y Knowledge Base configurados.
-* `treeflow_create_fertilizer`: Agrega una herramienta externa, automatización o base de conocimiento.
-* `treeflow_delete_fertilizer`: Elimina una herramienta o fertilizante.
+### 6. 🧪 Herramientas del bot: APIs y Scripts
+Las **herramientas** son lo que el bot puede ejecutar durante una conversación: llamadas a APIs externas y scripts propios. Se guardan con campos planos (`url`, `method`, `body`, `authType`, `inputVariables`, `outputVariables`…). Las variables se escriben `{ $nombre }` en la URL y el cuerpo.
+
+* `treeflow_list_fertilizers`: Lista las APIs, los scripts y el webhook principal. Contraseñas y tokens salen enmascarados (`***`).
+* `treeflow_create_tool` / `treeflow_update_tool` / `treeflow_delete_tool`: Crea, modifica (solo lo que cambia) o elimina una API, por id o nombre.
+* `treeflow_test_tool`: Prueba la API con el **mismo ejecutor que usa la conversación** (llamada real). Devuelve estado `ok` / `sin_datos` / `error`, código HTTP, entradas y salidas extraídas.
+* `treeflow_list_tool_logs`: Historial de ejecuciones, con filtros.
+* `treeflow_create_script` / `treeflow_update_script` / `treeflow_delete_script`: Scripts Python o Node.js (`inputs.get("x")`, resultado en `outputs`).
+* `treeflow_test_script`: Ejecuta un script en caliente: outputs, stdout, stderr y tiempo.
+
+> **Cambio en 1.1.0:** `treeflow_create_fertilizer` y `treeflow_delete_fertilizer` se reemplazan por `treeflow_create_tool` y `treeflow_delete_tool`. La creación anterior guardaba la herramienta como `{ type, config }`, una forma que el motor no ejecuta.
+
+### 6b. 🧩 Capturas (preguntas reutilizables del slot filling)
+* `treeflow_list_captures` / `treeflow_get_capture`: Consulta las capturas del bot.
+* `treeflow_create_capture` / `treeflow_update_capture` / `treeflow_delete_capture`: Gestiona la pregunta, el texto de respaldo, el límite de insistencia y qué hacer al alcanzarlo. Varios parámetros pueden compartir una captura; surte efecto sin reentrenar.
+
+### 6c. 🙋 Transferencia a humano
+* `treeflow_list_transfers` / `treeflow_create_transfer` / `treeflow_update_transfer` / `treeflow_delete_transfer`: Configura la derivación a un asesor (endpoint externo opcional, historial, mensaje al usuario).
+* `treeflow_test_transfer`: Prueba el envío al endpoint configurado.
+
+### 6d. 🧪 Suites de prueba del bot
+* `treeflow_list_test_suites` / `treeflow_get_test_suite` / `treeflow_create_test_suite` / `treeflow_update_test_suite` / `treeflow_delete_test_suite`: Conversaciones guiadas con comprobaciones (`intencion`, `respuesta_contiene`, `parametro`, `slot`, `evento`).
+* `treeflow_import_test_suite_csv` / `treeflow_export_test_suite_csv`: Casos desde y hacia CSV.
+* `treeflow_run_test_suite`: Ejecuta la suite completa y devuelve el resultado.
+* `treeflow_list_test_runs` / `treeflow_get_test_run` / `treeflow_compare_test_runs`: Historial de ejecuciones y detección de regresiones entre dos de ellas.
+
+### 6e. 🎧 Mesa de ayuda (solo lectura)
+* `treeflow_get_live_chat_queue`: Conversaciones esperando o en atención.
+* `treeflow_get_live_chat_history`: Historial de atenciones, con filtros.
+* `treeflow_get_live_chat_session`: Detalle y turnos de una atención.
+
+> Tomar, responder o cerrar una atención **no** se expone: es hablar con un cliente real en nombre de una persona, y se hace desde la mesa de ayuda de Treeflow.
 
 ### 7. 🔌 Canales & Integraciones (Injertos)
 * `treeflow_list_integrations`: Consulta el estado de los canales (WhatsApp, Webchat, Telegram, Webhooks).
@@ -122,6 +150,10 @@ A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupad
 * `treeflow_list_change_history`: Historial de auditoría para saber qué usuario modificó qué elemento y cuándo.
 * `treeflow_list_backups`: Lista los snapshots de seguridad del bot.
 * `treeflow_create_backup`: Crea un snapshot completo antes de realizar cambios importantes.
+* `treeflow_restore_snapshot`: Restaura el bot a un snapshot, **sobrescribiendo el estado actual**. Exige `confirm: true` y crea antes un snapshot de seguridad.
+* `treeflow_export_tree`: Exporta el bot completo (con scripts y herramientas) como JSON; las conversaciones son opcionales.
+* `treeflow_import_tree`: Crea un bot **nuevo** desde un export, sin tocar los existentes.
+* `treeflow_get_conversation_analytics`: Métricas de conversaciones: intenciones, fallback, retención y árbol de flujo.
 
 ### 12. 👥 Usuarios & Credenciales del Workspace
 * `treeflow_list_users`: Lista los miembros y roles del workspace.

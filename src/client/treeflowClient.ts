@@ -21,6 +21,80 @@ function normalizeEntityValues(values?: any[]) {
   }));
 }
 
+
+// ── Herramientas (APIs) y scripts ─────────────────────────────────────────
+// La app guarda cada herramienta con campos planos (url, method, body, authType,
+// authConfig, inputVariables…), no como { type, config }. Una herramienta con otra
+// forma aparece en la lista pero el motor no sabe ejecutarla.
+
+export interface ToolVariableInput {
+  name: string;
+  type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  description?: string;
+  jsonPath?: string;
+  testValue?: string;
+  fallbackValue?: string;
+}
+
+function toVariables(vars?: ToolVariableInput[]) {
+  return (vars || []).map((v) => ({
+    id: randomUUID(),
+    name: v.name,
+    type: v.type ?? 'string',
+    description: v.description ?? '',
+    jsonPath: v.jsonPath ?? '',
+    ...(v.testValue !== undefined ? { testValue: v.testValue } : {}),
+    ...(v.fallbackValue !== undefined ? { fallbackValue: v.fallbackValue } : {}),
+  }));
+}
+
+export interface ToolInput {
+  name?: string;
+  description?: string;
+  url?: string;
+  method?: 'POST' | 'GET' | 'PATCH' | 'DELETE' | 'PUT' | 'QUERY';
+  timeout?: number;
+  body?: string;
+  authType?: 'none' | 'basic' | 'bearer' | 'apiKey';
+  authConfig?: Record<string, any>;
+  inputVariables?: ToolVariableInput[];
+  outputVariables?: ToolVariableInput[];
+  enabled?: boolean;
+  errorMessage?: Record<string, string>;
+}
+
+export interface ScriptInput {
+  name?: string;
+  description?: string;
+  language?: 'python' | 'node' | 'javascript';
+  code?: string;
+  timeout?: number;
+  inputVariables?: ToolVariableInput[];
+  outputVariables?: ToolVariableInput[];
+  enabled?: boolean;
+  errorMessage?: Record<string, string>;
+}
+
+// Oculta secretos en lo que se devuelve al modelo. Los valores reales siguen en el
+// servidor y las actualizaciones los conservan: se parte siempre de la config guardada.
+const MASK = '***';
+export function maskSecrets<T>(value: T): T {
+  const secretKeys = new Set(['password', 'token', 'secretPhrase', 'auth_token', 'api_key', 'apiKey']);
+  const walk = (v: any, key?: string): any => {
+    if (Array.isArray(v)) return v.map((x) => walk(x));
+    if (v && typeof v === 'object') {
+      const out: Record<string, any> = {};
+      for (const [k, x] of Object.entries(v)) out[k] = walk(x, k);
+      // authConfig.value guarda la clave de una API de tipo apiKey
+      if ('key' in out && 'value' in out && (v as any).value) out.value = MASK;
+      return out;
+    }
+    if (key && secretKeys.has(key) && typeof v === 'string' && v) return MASK;
+    return v;
+  };
+  return walk(value);
+}
+
 export class TreeflowClient {
   private client: AxiosInstance;
   public workspaceId: string;
@@ -262,6 +336,340 @@ export class TreeflowClient {
       tree_id: treeId,
       workspace_id: this.workspaceId,
     });
+    return response.data;
+  }
+
+  // Config guardada lista para volver a enviarse: las tools y scripts van en las
+  // claves que el backend lee (`additionalFertilizers` y `scripts`).
+  private async loadFertilizerConfig(treeId: string) {
+    const current = await this.listFertilizers(treeId);
+    const { custom_scripts: _legacy, ...rest } = current || {};
+    return {
+      ...rest,
+      additionalFertilizers: [...(current?.additionalFertilizers || current?.additional_tools || [])],
+      scripts: [...(current?.scripts || current?.custom_scripts || [])],
+    };
+  }
+
+  private saveFertilizerConfig(treeId: string, config: any) {
+    return this.updateFertilizerConfig(treeId, config);
+  }
+
+  private pickById<T extends { id: string; name?: string }>(list: T[], idOrName: string): T | undefined {
+    return list.find((x) => x.id === idOrName) || list.find((x) => x.name === idOrName);
+  }
+
+  async createTool(treeId: string, input: ToolInput & { name: string; url: string }) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const tool = {
+      id: randomUUID(),
+      name: input.name,
+      description: input.description ?? '',
+      url: input.url,
+      method: input.method ?? 'POST',
+      timeout: input.timeout ?? 30000,
+      body: input.body ?? '{}',
+      authType: input.authType ?? 'none',
+      authConfig: input.authConfig ?? {},
+      inputVariables: toVariables(input.inputVariables),
+      outputVariables: toVariables(input.outputVariables),
+      lastResponse: '',
+      enabled: input.enabled ?? true,
+      status: 'unconfigured',
+      deployedDate: null,
+      ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+    };
+    config.additionalFertilizers.push(tool);
+    await this.saveFertilizerConfig(treeId, config);
+    // El backend sanea el nombre (únicos, sin espacios): se relee para devolver el real.
+    const saved = await this.loadFertilizerConfig(treeId);
+    return saved.additionalFertilizers.find((t: any) => t.id === tool.id) ?? tool;
+  }
+
+  async updateTool(treeId: string, toolId: string, patch: ToolInput & { status?: string }) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const tool = this.pickById<any>(config.additionalFertilizers, toolId);
+    if (!tool) throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
+    const { inputVariables, outputVariables, authConfig, ...simple } = patch;
+    Object.assign(tool, pickDefined(simple));
+    if (authConfig !== undefined) tool.authConfig = { ...(tool.authConfig || {}), ...authConfig };
+    if (inputVariables !== undefined) tool.inputVariables = toVariables(inputVariables);
+    if (outputVariables !== undefined) tool.outputVariables = toVariables(outputVariables);
+    // Cualquier cambio invalida la validación anterior, como en el editor de la app.
+    if (patch.status === undefined) tool.status = 'unconfigured';
+    await this.saveFertilizerConfig(treeId, config);
+    const saved = await this.loadFertilizerConfig(treeId);
+    return saved.additionalFertilizers.find((t: any) => t.id === tool.id) ?? tool;
+  }
+
+  async deleteTool(treeId: string, toolId: string) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const tool = this.pickById<any>(config.additionalFertilizers, toolId);
+    if (!tool) throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
+    config.additionalFertilizers = config.additionalFertilizers.filter((t: any) => t.id !== tool.id);
+    await this.saveFertilizerConfig(treeId, config);
+    return { deleted: tool.id, name: tool.name };
+  }
+
+  /** Prueba la herramienta guardada con el mismo ejecutor que usa la conversación. */
+  async testTool(treeId: string, toolId: string, testValues?: Record<string, string>) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const tool = this.pickById<any>(config.additionalFertilizers, toolId);
+    if (!tool) throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
+    const toTest = {
+      ...tool,
+      inputVariables: (tool.inputVariables || []).map((v: any) => ({
+        ...v,
+        ...(testValues && testValues[v.name] !== undefined ? { testValue: testValues[v.name] } : {}),
+      })),
+    };
+    const response = await this.client.post(`/api/fertilizers/${treeId}/tools/test`, { tool: toTest });
+    return response.data;
+  }
+
+  async createScript(treeId: string, input: ScriptInput & { name: string; code: string }) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const script = {
+      id: randomUUID(),
+      name: input.name,
+      description: input.description ?? '',
+      language: input.language ?? 'python',
+      code: input.code,
+      timeout: input.timeout ?? 5000,
+      inputVariables: toVariables(input.inputVariables),
+      outputVariables: toVariables(input.outputVariables),
+      status: 'unconfigured',
+      deployedDate: null,
+      lastResponse: '',
+      enabled: input.enabled ?? true,
+      ...(input.errorMessage ? { errorMessage: input.errorMessage } : {}),
+    };
+    config.scripts.push(script);
+    await this.saveFertilizerConfig(treeId, config);
+    const saved = await this.loadFertilizerConfig(treeId);
+    return saved.scripts.find((x: any) => x.id === script.id) ?? script;
+  }
+
+  async updateScript(treeId: string, scriptId: string, patch: ScriptInput & { status?: string }) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const script = this.pickById<any>(config.scripts, scriptId);
+    if (!script) throw new Error(`No existe el script "${scriptId}" en el bot ${treeId}.`);
+    const { inputVariables, outputVariables, ...simple } = patch;
+    Object.assign(script, pickDefined(simple));
+    if (inputVariables !== undefined) script.inputVariables = toVariables(inputVariables);
+    if (outputVariables !== undefined) script.outputVariables = toVariables(outputVariables);
+    if (patch.status === undefined) script.status = 'unconfigured';
+    await this.saveFertilizerConfig(treeId, config);
+    const saved = await this.loadFertilizerConfig(treeId);
+    return saved.scripts.find((x: any) => x.id === script.id) ?? script;
+  }
+
+  async deleteScript(treeId: string, scriptId: string) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const script = this.pickById<any>(config.scripts, scriptId);
+    if (!script) throw new Error(`No existe el script "${scriptId}" en el bot ${treeId}.`);
+    config.scripts = config.scripts.filter((x: any) => x.id !== script.id);
+    await this.saveFertilizerConfig(treeId, config);
+    return { deleted: script.id, name: script.name };
+  }
+
+  /** Ejecuta el script guardado en caliente. */
+  async testScript(treeId: string, scriptId: string, testValues?: Record<string, string>) {
+    const config = await this.loadFertilizerConfig(treeId);
+    const script = this.pickById<any>(config.scripts, scriptId);
+    if (!script) throw new Error(`No existe el script "${scriptId}" en el bot ${treeId}.`);
+    const response = await this.client.post(`/api/fertilizers/${treeId}/scripts/test`, {
+      name: script.name,
+      language: script.language,
+      code: script.code,
+      timeout: script.timeout || 5000,
+      inputVariables: (script.inputVariables || []).map((v: any) => ({
+        ...v,
+        ...(testValues && testValues[v.name] !== undefined ? { testValue: testValues[v.name] } : {}),
+      })),
+      outputVariables: script.outputVariables || [],
+      sessionParams: {},
+    });
+    return response.data;
+  }
+
+  async listToolLogs(treeId: string, params: { limit?: number; offset?: number; success?: boolean; tool_name?: string; search?: string; date_from?: string; date_to?: string } = {}) {
+    const response = await this.client.get(`/api/fertilizers/${treeId}/tool-logs`, { params: pickDefined(params) });
+    return response.data;
+  }
+
+  // --- 7b. CAPTURAS (preguntas reutilizables del slot filling) ---
+  async listCaptures(treeId: string) {
+    const response = await this.client.get(`/trees/${treeId}/captures`);
+    return response.data;
+  }
+
+  async getCapture(treeId: string, ref: string) {
+    const response = await this.client.get(`/trees/${treeId}/captures/${encodeURIComponent(ref)}`);
+    return response.data;
+  }
+
+  async createCapture(treeId: string, data: Record<string, any>) {
+    const response = await this.client.post(`/trees/${treeId}/captures`, data);
+    return response.data;
+  }
+
+  // El PUT del backend sustituye la captura entera: se parte de la guardada y se
+  // aplica sólo lo que cambia, para no borrar campos que el usuario no mencionó.
+  async updateCapture(treeId: string, ref: string, patch: Record<string, any>) {
+    const current = await this.getCapture(treeId, ref);
+    const keep = [
+      'name', 'prompt', 'prompt_rich', 'prompt_blocks', 'prompt_responses', 'prompt_template_id',
+      'fallback', 'fallback_rich', 'fallback_blocks', 'fallback_responses', 'fallback_template_id',
+      'limit', 'on_limit_action',
+    ];
+    const base: Record<string, any> = {};
+    for (const k of keep) if (current?.[k] !== undefined) base[k] = current[k];
+    const response = await this.client.put(`/trees/${treeId}/captures/${encodeURIComponent(ref)}`, { ...base, ...pickDefined(patch) });
+    return response.data;
+  }
+
+  async deleteCapture(treeId: string, ref: string) {
+    const response = await this.client.delete(`/trees/${treeId}/captures/${encodeURIComponent(ref)}`);
+    return response.data;
+  }
+
+  // --- 7c. TRANSFERENCIA A HUMANO ---
+  async listTransfers(treeId: string) {
+    const response = await this.client.get(`/api/integrations/transfers/${treeId}`);
+    return response.data;
+  }
+
+  async createTransfer(treeId: string, data: Record<string, any>) {
+    const response = await this.client.post(`/api/integrations/transfers/${treeId}`, data);
+    return response.data;
+  }
+
+  // Igual que las capturas: el PUT exige el cuerpo completo (el nombre es obligatorio).
+  async updateTransfer(treeId: string, configId: string, patch: Record<string, any>) {
+    const current = await this.client.get(`/api/integrations/transfers/${treeId}/${configId}`).then((r) => r.data);
+    const keep = [
+      'name', 'description', 'endpoint_url', 'auth_token', 'custom_headers', 'include_history',
+      'history_format', 'agent_stops_listening', 'persist_widget_chat', 'transfer_message', 'is_active',
+    ];
+    const base: Record<string, any> = {};
+    for (const k of keep) if (current?.[k] !== undefined && current?.[k] !== null) base[k] = current[k];
+    const response = await this.client.put(`/api/integrations/transfers/${treeId}/${configId}`, { ...base, ...pickDefined(patch) });
+    return response.data;
+  }
+
+  async deleteTransfer(treeId: string, configId: string) {
+    const response = await this.client.delete(`/api/integrations/transfers/${treeId}/${configId}`);
+    return response.data;
+  }
+
+  async testTransfer(treeId: string, configId: string, data: Record<string, any> = {}) {
+    const response = await this.client.post(`/api/integrations/transfers/${treeId}/${configId}/test`, data);
+    return response.data;
+  }
+
+  // --- 7d. MESA DE AYUDA (chat en vivo): sólo lectura ---
+  // Responder, tomar o cerrar una atención es actuar como operador frente a un
+  // cliente real: eso se hace desde la mesa de ayuda, no desde un asistente.
+  async getLiveChatQueue(treeId?: string) {
+    const response = await this.client.get('/api/live-chat/queue', { params: pickDefined({ tree_id: treeId }) });
+    return response.data;
+  }
+
+  async getLiveChatHistory(params: { tree_id?: string; desde?: string; hasta?: string; estado?: string; q?: string; limit?: number; offset?: number } = {}) {
+    const response = await this.client.get('/api/live-chat/history', { params: pickDefined(params) });
+    return response.data;
+  }
+
+  async getLiveChatSession(sessionId: string) {
+    const response = await this.client.get(`/api/live-chat/sessions/${sessionId}`);
+    return response.data;
+  }
+
+  // --- 7e. SUITES DE PRUEBA DEL BOT ---
+  async listTestSuites(treeId: string) {
+    const response = await this.client.get(`/trees/${treeId}/test-suites`);
+    return response.data;
+  }
+
+  async createTestSuite(treeId: string, data: { name: string; description?: string; cases?: any[] }) {
+    const response = await this.client.post(`/trees/${treeId}/test-suites`, data);
+    return response.data;
+  }
+
+  async getTestSuite(suiteId: string) {
+    const response = await this.client.get(`/test-suites/${suiteId}`);
+    return response.data;
+  }
+
+  async updateTestSuite(suiteId: string, data: { name?: string; description?: string; cases?: any[] }) {
+    const response = await this.client.put(`/test-suites/${suiteId}`, data);
+    return response.data;
+  }
+
+  async deleteTestSuite(suiteId: string) {
+    const response = await this.client.delete(`/test-suites/${suiteId}`);
+    return response.data;
+  }
+
+  async importTestSuiteCsv(suiteId: string, csv: string, modo: 'reemplazar' | 'agregar' = 'reemplazar') {
+    const response = await this.client.post(`/test-suites/${suiteId}/import-csv`, { csv, modo });
+    return response.data;
+  }
+
+  async exportTestSuiteCsv(suiteId: string): Promise<string> {
+    const response = await this.client.get(`/test-suites/${suiteId}/export-csv`, { responseType: 'text' });
+    return response.data;
+  }
+
+  async runTestSuite(suiteId: string) {
+    const response = await this.client.post(`/test-suites/${suiteId}/run`);
+    return response.data;
+  }
+
+  async listTestRuns(suiteId: string, limit = 20) {
+    const response = await this.client.get(`/test-suites/${suiteId}/runs`, { params: { limit } });
+    return response.data;
+  }
+
+  async getTestRun(runId: string) {
+    const response = await this.client.get(`/test-runs/${runId}`);
+    return response.data;
+  }
+
+  async compareTestRuns(runId: string, otherRunId: string) {
+    const response = await this.client.get(`/test-runs/${runId}/compare/${otherRunId}`);
+    return response.data;
+  }
+
+  // --- 7f. ANALÍTICAS DE CONVERSACIONES ---
+  async getConversationAnalytics(treeId: string, params: { start_date?: number; end_date?: number; intent?: string; branch?: string; include_console?: boolean; max_depth?: number } = {}) {
+    const response = await this.client.get(`/api/trees/${treeId}/conversations/analytics`, { params: pickDefined(params) });
+    return response.data;
+  }
+
+  // --- 7g. EXPORTAR / IMPORTAR / RESTAURAR ---
+  async exportTree(treeId: string, includeConversations = false) {
+    const response = await this.client.get(`/api/backup/trees/${treeId}/export`, {
+      params: { include_conversations: includeConversations },
+    });
+    return response.data;
+  }
+
+  /** Crea un árbol NUEVO a partir de un export; no toca el existente. */
+  async importTree(backup: Record<string, any>, options?: Record<string, any>) {
+    const form = new FormData();
+    form.append('file', new Blob([JSON.stringify(backup)], { type: 'application/json' }), 'treeflow_backup.json');
+    if (options) form.append('options', JSON.stringify(options));
+    const response = await this.client.post('/api/backup/trees/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      maxBodyLength: Infinity,
+    });
+    return response.data;
+  }
+
+  async restoreSnapshot(treeId: string, snapshotId: string) {
+    const response = await this.client.post(`/api/backup/trees/${treeId}/snapshots/${snapshotId}/restore`);
     return response.data;
   }
 

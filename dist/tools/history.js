@@ -72,6 +72,30 @@ export function registerHistoryTools(client) {
                 };
             },
         },
+        {
+            name: 'treeflow_get_conversation_analytics',
+            description: 'Métricas analíticas de las conversaciones del bot: volumen, intenciones, tasas de fallback, retención y árbol de flujo de la conversación. Por defecto excluye las conversaciones de la consola de prueba.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    tree_id: { type: 'string', description: 'ID del bot/árbol' },
+                    start_date: { type: 'number', description: 'Timestamp Unix (segundos) de inicio' },
+                    end_date: { type: 'number', description: 'Timestamp Unix (segundos) de fin' },
+                    intent: { type: 'string', description: 'Filtrar por intención' },
+                    branch: { type: 'string', description: 'Filtrar por rama (ID)' },
+                    include_console: { type: 'boolean', description: 'Incluir conversaciones de la consola de prueba (default false)' },
+                    max_depth: { type: 'integer', description: 'Profundidad máxima del árbol de flujo, 1-10 (default 5)' },
+                },
+                required: ['tree_id'],
+            },
+            handler: async (args) => {
+                const { tree_id, ...params } = args;
+                const result = await client.getConversationAnalytics(tree_id, params);
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+                };
+            },
+        },
     ];
 }
 //# sourceMappingURL=history.js.map
