@@ -12,6 +12,7 @@ export declare function registerBackupTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            archivo?: undefined;
             backup?: undefined;
             snapshot_id?: undefined;
             confirm?: undefined;
@@ -33,6 +34,10 @@ export declare function registerBackupTools(client: TreeflowClient): ({
     inputSchema: {
         type: string;
         properties: {
+            archivo: {
+                type: string;
+                description: string;
+            };
             backup: {
                 type: string;
                 description: string;
@@ -42,10 +47,11 @@ export declare function registerBackupTools(client: TreeflowClient): ({
             snapshot_id?: undefined;
             confirm?: undefined;
         };
-        required: string[];
+        required?: undefined;
     };
     handler: (a: {
-        backup: Record<string, any>;
+        archivo?: string;
+        backup?: Record<string, any>;
     }) => Promise<{
         content: {
             type: string;
@@ -70,6 +76,7 @@ export declare function registerBackupTools(client: TreeflowClient): ({
                 description: string;
             };
             include_conversations?: undefined;
+            archivo?: undefined;
             backup?: undefined;
         };
         required: string[];

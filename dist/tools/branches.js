@@ -1,8 +1,11 @@
+import { branchesSummary } from './resumen.js';
+import { ok } from './util.js';
 export function registerBranchTools(client) {
     return [
         {
             name: 'treeflow_list_branches',
-            description: 'Lista todas las ramas (bloques de flujo del canvas) de un bot en Treeflow.',
+            description: 'Lista las ramas (flujos del canvas) de un bot, sin sus hojas: sólo cuántas tiene cada una y cuál es la de ' +
+                'inicio. Las hojas de una rama: treeflow_list_leafs.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -10,12 +13,7 @@ export function registerBranchTools(client) {
                 },
                 required: ['tree_id'],
             },
-            handler: async (args) => {
-                const branches = await client.listBranches(args.tree_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(branches, null, 2) }],
-                };
-            },
+            handler: async (args) => ok(branchesSummary(await client.listBranches(args.tree_id))),
         },
         {
             name: 'treeflow_create_branch',

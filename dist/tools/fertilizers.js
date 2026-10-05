@@ -1,4 +1,5 @@
 import { maskSecrets } from '../client/treeflowClient.js';
+import { fertilizersSummary, toolLogsSummary } from './resumen.js';
 import { ok, variableSchema } from './util.js';
 const TOOL_NOTE = 'Las variables se escriben { $nombre } en la URL y el cuerpo (la sintaxis {{ }} ya no existe). ' +
     'Los nombres de herramientas son únicos por bot: si se repite, el servidor añade _2, _3…';
@@ -6,14 +7,15 @@ export function registerFertilizerTools(client) {
     return [
         {
             name: 'treeflow_list_fertilizers',
-            description: 'Lista las herramientas del bot: APIs externas (additionalFertilizers), scripts personalizados y el webhook principal. ' +
-                'Contraseñas, tokens y claves salen enmascarados (***).',
+            description: 'Lista las herramientas del bot: el webhook principal, las APIs externas y los scripts, cada una con su ID, ' +
+                'estado y los nombres de sus variables. La configuración completa de una (URL, cuerpo, código, ' +
+                'autenticación): treeflow_get_detail con tipo tool o script. Los secretos salen enmascarados (***).',
             inputSchema: {
                 type: 'object',
                 properties: { tree_id: { type: 'string', description: 'ID del bot/árbol' } },
                 required: ['tree_id'],
             },
-            handler: async (args) => ok(maskSecrets(await client.listFertilizers(args.tree_id))),
+            handler: async (args) => ok(fertilizersSummary(await client.listFertilizers(args.tree_id))),
         },
         {
             name: 'treeflow_create_tool',
@@ -104,12 +106,13 @@ export function registerFertilizerTools(client) {
         },
         {
             name: 'treeflow_list_tool_logs',
-            description: 'Historial de ejecuciones de herramientas del bot (las reales de conversaciones y las pruebas), con filtros.',
+            description: 'Historial de ejecuciones de herramientas del bot (las reales de conversaciones y las pruebas), con filtros. ' +
+                'Una línea por ejecución: resultado, tiempo, error y entradas/salidas recortadas.',
             inputSchema: {
                 type: 'object',
                 properties: {
                     tree_id: { type: 'string' },
-                    limit: { type: 'integer', description: 'Default 50' },
+                    limit: { type: 'integer', description: 'Default 20' },
                     offset: { type: 'integer' },
                     success: { type: 'boolean', description: 'true sólo exitosas, false sólo fallidas' },
                     tool_name: { type: 'string' },
@@ -121,7 +124,7 @@ export function registerFertilizerTools(client) {
             },
             handler: async (a) => {
                 const { tree_id, ...params } = a;
-                return ok(await client.listToolLogs(tree_id, params));
+                return ok(toolLogsSummary(await client.listToolLogs(tree_id, { limit: 20, ...params })));
             },
         },
         {

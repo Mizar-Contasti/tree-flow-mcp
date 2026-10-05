@@ -1,26 +1,39 @@
+import { changeHistorySummary, trainingHistorySummary, withoutNoise } from './resumen.js';
+import { ok } from './util.js';
 export function registerHistoryTools(client) {
     return [
         {
             name: 'treeflow_list_change_history',
-            description: 'Obtiene el historial de auditoría de cambios del bot: quién modificó qué nodo, intención, configuración o entidad y cuándo.',
+            description: 'Historial de auditoría del bot: quién cambió qué (hoja, rama, intención, entidad, plantilla, configuración), ' +
+                'cuándo y qué campos tocó, una línea por cambio. Con change_id devuelve el antes/después completo de ese cambio.',
             inputSchema: {
                 type: 'object',
                 properties: {
                     tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    limit: { type: 'integer', description: 'Cantidad máxima de registros a obtener (default: 50)' },
+                    limit: { type: 'integer', description: 'Cuántos cambios (default 20, máx. 500)' },
+                    offset: { type: 'integer', description: 'Para paginar' },
+                    entity_type: { type: 'string', description: 'Filtrar por tipo: intent, entity, branch, message, fertilizer, injerto, tree…' },
+                    action: { type: 'string', enum: ['created', 'updated', 'deleted'] },
+                    change_id: { type: 'string', description: 'Devuelve sólo ese cambio, con su antes/después' },
                 },
                 required: ['tree_id'],
             },
             handler: async (args) => {
-                const result = await client.listChangeHistory(args.tree_id, args.limit || 50);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                const { tree_id, change_id, ...params } = args;
+                if (change_id) {
+                    const recent = await client.listChangeHistory(tree_id, { ...params, limit: 500 });
+                    const entry = recent.find((e) => e.change_id === change_id);
+                    if (!entry)
+                        throw new Error(`No está el cambio ${change_id} entre los 500 más recientes que cumplen el filtro.`);
+                    return ok(JSON.stringify(withoutNoise(entry)));
+                }
+                return ok(changeHistorySummary(await client.listChangeHistory(tree_id, params)));
             },
         },
         {
             name: 'treeflow_list_training_history',
-            description: 'Obtiene el historial detallado de entrenamientos del bot con métricas de exactitud, duración y registros de errores.',
+            description: 'Historial de entrenamientos del bot: fecha, estado, duración, cuántas intenciones y entidades entrenó y el ' +
+                'error si falló. Una línea por entrenamiento.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -30,12 +43,7 @@ export function registerHistoryTools(client) {
                 },
                 required: ['tree_id'],
             },
-            handler: async (args) => {
-                const result = await client.listTrainingHistory(args.tree_id, args.page || 1, args.page_size || 10);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
-            },
+            handler: async (args) => ok(trainingHistorySummary(await client.listTrainingHistory(args.tree_id, args.page || 1, args.page_size || 10))),
         },
         {
             name: 'treeflow_list_backups',

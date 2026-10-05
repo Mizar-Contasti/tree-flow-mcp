@@ -16,6 +16,7 @@ import { registerTransferTools } from './tools/transfers.js';
 import { registerSuiteTools } from './tools/suites.js';
 import { registerLiveChatTools } from './tools/livechat.js';
 import { registerBackupTools } from './tools/backups.js';
+import { registerDetailTools } from './tools/detail.js';
 // Reglas que ninguna descripción de herramienta puede transmitir por sí sola:
 // aplican al servicio completo y evitan los errores más caros (sobre todo
 // olvidar el reentrenamiento, que deja los cambios sin efecto en silencio).
@@ -35,9 +36,10 @@ entidades, llama a treeflow_trigger_training. Si no lo haces, el motor NLU sigue
 usando el modelo viejo y tus cambios no surten efecto, sin aviso ni error.
 Confirma con treeflow_get_training_status: can_use debe quedar en true.
 
-EXPLORAR: usa treeflow_get_tree_data para obtener la estructura completa de un bot
-(ramas, hojas, intenciones, entidades y plantillas) en una sola llamada, en vez de
-encadenar varios list.
+EXPLORAR: treeflow_get_tree_data da el esquema de todo el bot en una llamada (cada
+hoja en una línea, con su ID). Las lecturas resumen; el detalle completo de una pieza
+se pide con treeflow_get_detail, y sólo de lo que vayas a tocar: todo lo que leas se
+queda en la conversación y cuesta en cada llamada siguiente.
 
 PATRONES: dentro de las frases de una intención, las entidades se referencian con
 arroba, por ejemplo "quiero una @tipo_habitacion".
@@ -80,6 +82,7 @@ irreversible. Si el usuario lo pide, dile que lo haga desde el panel de Treeflow
 export function buildToolGroups(client) {
     return {
         trees: registerTreeTools(client),
+        detail: registerDetailTools(client),
         branches: registerBranchTools(client),
         leafs: registerLeafTools(client),
         intents: registerIntentTools(client),

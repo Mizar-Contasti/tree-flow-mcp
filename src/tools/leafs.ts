@@ -1,10 +1,14 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { DETAIL_HINT, branchOutline, canvasNames } from './resumen.js';
+import { ok } from './util.js';
 
 export function registerLeafTools(client: TreeflowClient) {
   return [
     {
       name: 'treeflow_list_leafs',
-      description: 'Lista todos los nodos (leafs) dentro de una rama específica del canvas.',
+      description:
+        'Esquema de las hojas de una rama: una línea por hoja con su tipo, ID, qué dice, qué escucha y a dónde va. ' +
+        'El config completo de una hoja: treeflow_get_detail con tipo leaf.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -13,10 +17,10 @@ export function registerLeafTools(client: TreeflowClient) {
         required: ['branch_id'],
       },
       handler: async (args: { branch_id: string }) => {
-        const leafs = await client.listLeafs(args.branch_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(leafs, null, 2) }],
-        };
+        const branch = await client.getBranch(args.branch_id);
+        // Los nombres de las plantillas permiten decir con cuál habla cada hoja.
+        const templates = branch?.tree_id ? await client.listMessageTemplates(branch.tree_id).catch(() => []) : [];
+        return ok(`${branchOutline(branch, canvasNames([branch], templates))}\n${DETAIL_HINT}`);
       },
     },
     {

@@ -1,10 +1,14 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { DETAIL_HINT, templatesSummary } from './resumen.js';
+import { ok } from './util.js';
 
 export function registerTemplateTools(client: TreeflowClient) {
   return [
     {
       name: 'treeflow_list_message_templates',
-      description: 'Lista todas las plantillas de mensajes y respuestas enriquecidas configuradas en un bot de Treeflow.',
+      description:
+        'Lista las plantillas de mensaje de un bot: nombre, ID, el inicio de su texto y qué bloques enriquecidos ' +
+        'usa. Los bloques completos: treeflow_get_detail con tipo template.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -12,12 +16,8 @@ export function registerTemplateTools(client: TreeflowClient) {
         },
         required: ['tree_id'],
       },
-      handler: async (args: { tree_id: string }) => {
-        const templates = await client.listMessageTemplates(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(templates, null, 2) }],
-        };
-      },
+      handler: async (args: { tree_id: string }) =>
+        ok(`${templatesSummary(await client.listMessageTemplates(args.tree_id))}\n${DETAIL_HINT}`),
     },
     {
       name: 'treeflow_create_message_template',

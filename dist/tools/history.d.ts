@@ -13,6 +13,22 @@ export declare function registerHistoryTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            offset: {
+                type: string;
+                description: string;
+            };
+            entity_type: {
+                type: string;
+                description: string;
+            };
+            action: {
+                type: string;
+                enum: string[];
+            };
+            change_id: {
+                type: string;
+                description: string;
+            };
             page?: undefined;
             page_size?: undefined;
             note?: undefined;
@@ -28,6 +44,10 @@ export declare function registerHistoryTools(client: TreeflowClient): ({
     handler: (args: {
         tree_id: string;
         limit?: number;
+        offset?: number;
+        entity_type?: string;
+        action?: string;
+        change_id?: string;
     }) => Promise<{
         content: {
             type: string;
@@ -53,6 +73,10 @@ export declare function registerHistoryTools(client: TreeflowClient): ({
                 description: string;
             };
             limit?: undefined;
+            offset?: undefined;
+            entity_type?: undefined;
+            action?: undefined;
+            change_id?: undefined;
             note?: undefined;
             start_date?: undefined;
             end_date?: undefined;
@@ -84,6 +108,10 @@ export declare function registerHistoryTools(client: TreeflowClient): ({
                 description: string;
             };
             limit?: undefined;
+            offset?: undefined;
+            entity_type?: undefined;
+            action?: undefined;
+            change_id?: undefined;
             page?: undefined;
             page_size?: undefined;
             note?: undefined;
@@ -119,6 +147,10 @@ export declare function registerHistoryTools(client: TreeflowClient): ({
                 description: string;
             };
             limit?: undefined;
+            offset?: undefined;
+            entity_type?: undefined;
+            action?: undefined;
+            change_id?: undefined;
             page?: undefined;
             page_size?: undefined;
             start_date?: undefined;
@@ -174,6 +206,10 @@ export declare function registerHistoryTools(client: TreeflowClient): ({
                 description: string;
             };
             limit?: undefined;
+            offset?: undefined;
+            entity_type?: undefined;
+            action?: undefined;
+            change_id?: undefined;
             page?: undefined;
             page_size?: undefined;
             note?: undefined;

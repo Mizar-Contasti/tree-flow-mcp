@@ -232,7 +232,12 @@ export declare class TreeflowClient {
     simulateChatMessage(treeId: string, message: string, sessionId?: string): Promise<any>;
     listConversations(treeId: string): Promise<any>;
     getConversation(treeId: string, sessionId: string): Promise<any>;
-    listChangeHistory(treeId: string, limit?: number): Promise<any>;
+    listChangeHistory(treeId: string, params?: {
+        limit?: number;
+        offset?: number;
+        entity_type?: string;
+        action?: string;
+    }): Promise<any>;
     listBackups(treeId: string): Promise<any>;
     createBackup(treeId: string, note?: string): Promise<any>;
     listUsers(): Promise<any>;

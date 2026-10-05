@@ -89,20 +89,21 @@ Problemas encontrados:
 Listo cuando: la línea base está medida y build + pruebas pasan.
 
 ### Fase 1 — Lecturas: resumen primero, detalle bajo demanda
-- [ ] `get_tree_data` devuelve un esquema en texto: una línea por hoja con su tipo, ID,
+- [x] `get_tree_data` devuelve un esquema en texto: una línea por hoja con su tipo, ID,
       lo que dice (recortado), qué escucha y a dónde va; intenciones, entidades y
       plantillas con sus conteos.
-- [ ] `list_branches` devuelve las ramas sin sus hojas; `list_leafs`, el esquema de una rama.
-- [ ] `list_intents`, `list_entities`, `list_message_templates` y `list_fertilizers`
+- [x] `list_branches` devuelve las ramas sin sus hojas; `list_leafs`, el esquema de una rama.
+- [x] `list_intents`, `list_entities`, `list_message_templates` y `list_fertilizers`
       devuelven resúmenes (nombre, ID, conteos, nombres de variables), sin duplicados.
-- [ ] Una sola herramienta de detalle, `get_detail(tipo, id)`, para una hoja, intención,
-      entidad, plantilla, API o script. Una herramienta en vez de cinco: pesa menos en
-      el catálogo.
-- [ ] Historiales: `list_change_history` y `list_training_history` resumen cada registro
-      sin el antes/después; `list_tool_logs` recorta peticiones y respuestas.
-- [ ] `export_tree` guarda el JSON en un archivo local y devuelve la ruta y los conteos;
-      `import_tree` acepta esa ruta.
-- [ ] Instrucciones: explorar con el esquema y pedir el detalle de lo que se va a tocar.
+- [x] Una sola herramienta de detalle, `get_detail(tipo, ref)`, para una hoja, intención,
+      entidad, plantilla, API o script, por ID o por nombre único. Una herramienta en vez
+      de cinco: pesa menos en el catálogo.
+- [x] Historiales: `list_change_history` resume cada cambio con los campos que tocó (el
+      antes/después completo, con `change_id`) y acepta filtros; `list_training_history`
+      va sin `changes_detail`; `list_tool_logs` recorta entradas y salidas, 20 por defecto.
+- [x] `export_tree` guarda el JSON en `~/treeflow-exports` (o `TREEFLOW_EXPORT_DIR`) y
+      devuelve la ruta y los conteos; `import_tree` acepta esa ruta.
+- [x] Instrucciones: explorar con el esquema y pedir el detalle de lo que se va a tocar.
 
 Listo cuando: `get_tree_data` del árbol de referencia pesa ≤ 10% de la línea base,
 ninguna lectura de la tabla pasa de ~20,000 caracteres, y cada hoja, intención y
@@ -113,6 +114,10 @@ entidad sigue apareciendo con su ID.
       que se mandan, `null` borra una clave y `replace_config: true` sustituye todo.
 - [ ] Revisar las demás actualizaciones (plantillas, árbol, voz, integraciones, suites)
       y dejar dicho en cada descripción qué listas se sustituyen completas.
+- [ ] Secretos en la URL de una API (`?key=…`, `token=…`): hoy salen enteros al modelo,
+      porque `maskSecrets` sólo mira campos con nombre de secreto. Enmascararlos al leer
+      **y** restaurarlos al guardar, para que un `update_tool` con la URL enmascarada no
+      escriba `***` encima de la clave real.
 - [ ] Corregir la regla de las instrucciones para que diga la verdad.
 
 Listo cuando: en dev, cambiar sólo el `messageText` de una hoja conserva sus
@@ -155,7 +160,7 @@ Listo cuando: el catálogo por defecto ronda los 5,000 tokens.
 | Fase | Estado | Resultado |
 |---|---|---|
 | 0 | hecha | Línea base medida contra la API real; `npm test` y `npm run medir` |
-| 1 | pendiente | |
+| 1 | hecha | `get_tree_data` 426,573 → 41,347 car. (9.7%); `export_tree` 14.6 M → 339; ninguna otra lectura pasa de 9,400 |
 | 2 | pendiente | |
 | 3 | pendiente | |
 | 4 | pendiente | |

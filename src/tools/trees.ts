@@ -1,4 +1,6 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { treeOutline } from './resumen.js';
+import { ok } from './util.js';
 
 export function registerTreeTools(client: TreeflowClient) {
   return [
@@ -35,7 +37,10 @@ export function registerTreeTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_get_tree_data',
-      description: 'Obtiene la estructura COMPLETA del bot en un solo llamado (información básica, todas las ramas, nodos, intenciones, entidades y plantillas de mensaje). Ideal para entender todo el bot de una vez.',
+      description:
+        'Esquema de todo el bot en una llamada: cada rama con sus hojas (una línea por hoja: tipo, ID, qué dice, ' +
+        'qué escucha y a dónde va), y las intenciones, entidades y plantillas con sus conteos. Es un resumen: ' +
+        'el detalle de una pieza se pide con treeflow_get_detail.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -43,12 +48,7 @@ export function registerTreeTools(client: TreeflowClient) {
         },
         required: ['tree_id'],
       },
-      handler: async (args: { tree_id: string }) => {
-        const treeData = await client.getTreeData(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(treeData, null, 2) }],
-        };
-      },
+      handler: async (args: { tree_id: string }) => ok(treeOutline(await client.getTreeData(args.tree_id))),
     },
     {
       name: 'treeflow_create_tree',

@@ -636,9 +636,9 @@ export class TreeflowClient {
         return response.data;
     }
     // --- 12. AUDITORÍA & CAMBIOS ---
-    async listChangeHistory(treeId, limit = 50) {
+    async listChangeHistory(treeId, params = {}) {
         const response = await this.client.get(`/api/trees/${treeId}/history`, {
-            params: { limit },
+            params: { limit: 20, ...pickDefined(params) },
         });
         return response.data;
     }

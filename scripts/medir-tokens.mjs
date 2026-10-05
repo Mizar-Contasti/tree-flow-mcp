@@ -13,6 +13,7 @@
  * Los tokens son una estimación: caracteres / 3.5.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -37,6 +38,8 @@ if (!treeRef) {
   process.env.TREEFLOW_WORKSPACE_ID ||= 'sin-conexion';
 }
 process.chdir(ROOT); // config.ts lee el .env del directorio actual
+// export_tree escribe un archivo: al medir, que vaya a una carpeta temporal.
+process.env.TREEFLOW_EXPORT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'treeflow-medir-'));
 
 const dist = (p) => import(pathToFileURL(path.join(ROOT, 'dist', p)).href);
 const { TreeflowClient } = await dist('client/treeflowClient.js');
@@ -95,23 +98,30 @@ if (treeRef) {
   console.log(`\nLECTURAS sobre "${tree.name}" (${branches.length} ramas, ${branches.reduce((s, b) => s + (b.leaves?.length ?? 0), 0)} hojas)`);
   const reads = tools.filter((t) => /^treeflow_(list|get|export)_/.test(t.name));
   const rows = [];
+  const measure = async (label, tool, args) => {
+    try {
+      const r = await tool.handler(args);
+      const text = (r.content ?? []).map((c) => c.text ?? '').join('');
+      rows.push({ name: label, chars: text.length });
+    } catch (e) {
+      rows.push({ name: label, note: `error ${fail(e)}` });
+    }
+  };
   for (const t of reads) {
+    if (t.name === 'treeflow_get_detail') {
+      // Una medición por tipo, con la primera pieza de cada uno.
+      for (const [tipo, ref] of [['leaf', known.leaf_id], ['intent', known.intent_id], ['entity', known.entity_id]]) {
+        if (ref) await measure(`${t.name}(${tipo})`, t, { tree_id: known.tree_id, tipo, ref });
+      }
+      continue;
+    }
     const required = t.inputSchema?.required ?? [];
     const missing = required.filter((k) => known[k] === undefined);
     if (missing.length) {
       rows.push({ name: t.name, note: `necesita ${missing.join(', ')}` });
       continue;
     }
-    const args = Object.fromEntries(required.map((k) => [k, known[k]]));
-    // Las de detalle aceptan cualquiera de los dos para ubicar la hoja
-    if (t.name === 'treeflow_get_leaf') Object.assign(args, { tree_id: known.tree_id, leaf_id: known.leaf_id });
-    try {
-      const r = await t.handler(args);
-      const text = (r.content ?? []).map((c) => c.text ?? '').join('');
-      rows.push({ name: t.name, chars: text.length });
-    } catch (e) {
-      rows.push({ name: t.name, note: `error ${fail(e)}` });
-    }
+    await measure(t.name, t, Object.fromEntries(required.map((k) => [k, known[k]])));
   }
   rows.sort((a, b) => (b.chars ?? -1) - (a.chars ?? -1));
   for (const r of rows) {
@@ -120,6 +130,8 @@ if (treeRef) {
     console.log(`  ${r.name.replace('treeflow_', '').padEnd(32)} ${size}${r.note ? `(${r.note})` : ''}`);
   }
 }
+
+fs.rmSync(process.env.TREEFLOW_EXPORT_DIR, { recursive: true, force: true });
 
 if (saveTo) {
   fs.writeFileSync(saveTo, JSON.stringify(result, null, 2));

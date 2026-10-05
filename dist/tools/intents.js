@@ -1,8 +1,11 @@
+import { DETAIL_HINT, intentsSummary } from './resumen.js';
+import { ok } from './util.js';
 export function registerIntentTools(client) {
     return [
         {
             name: 'treeflow_list_intents',
-            description: 'Lista todas las intenciones NLU de un bot con sus frases de entrenamiento y parámetros/slots asociados.',
+            description: 'Lista las intenciones NLU de un bot: nombre, ID, cuántas frases tiene y sus parámetros. Las frases y la ' +
+                'configuración de los parámetros: treeflow_get_detail con tipo intent.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -10,12 +13,7 @@ export function registerIntentTools(client) {
                 },
                 required: ['tree_id'],
             },
-            handler: async (args) => {
-                const intents = await client.listIntents(args.tree_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(intents, null, 2) }],
-                };
-            },
+            handler: async (args) => ok(`${intentsSummary(await client.listIntents(args.tree_id))}\n${DETAIL_HINT}`),
         },
         {
             name: 'treeflow_create_intent',
