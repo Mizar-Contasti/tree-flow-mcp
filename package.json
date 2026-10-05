@@ -15,6 +15,8 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
+    "test": "tsc && node --test test/*.test.mjs",
+    "medir": "node scripts/medir-tokens.mjs",
     "validate:routes": "node scripts/validate-routes.mjs"
   },
   "keywords": [
