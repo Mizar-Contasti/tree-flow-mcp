@@ -1,4 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { ok } from './util.js';
 
 export function registerTrainingTools(client: TreeflowClient) {
   return [
@@ -14,9 +15,7 @@ export function registerTrainingTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string }) => {
         const result = await client.triggerTraining(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
     {
@@ -31,9 +30,7 @@ export function registerTrainingTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string }) => {
         const status = await client.getTrainingStatus(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
-        };
+        return ok(status);
       },
     },
   ];

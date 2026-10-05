@@ -1,4 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { suiteLine, testRunSummary } from './resumen.js';
 import { ok } from './util.js';
 
 const casesSchema = {
@@ -60,7 +61,7 @@ export function registerSuiteTools(client: TreeflowClient) {
       },
       handler: async (a: any) => {
         const { tree_id, ...data } = a;
-        return ok(await client.createTestSuite(tree_id, data));
+        return ok(`${suiteLine(await client.createTestSuite(tree_id, data))} creada`);
       },
     },
     {
@@ -73,7 +74,7 @@ export function registerSuiteTools(client: TreeflowClient) {
       },
       handler: async (a: any) => {
         const { suite_id, ...data } = a;
-        return ok(await client.updateTestSuite(suite_id, data));
+        return ok(`${suiteLine(await client.updateTestSuite(suite_id, data))} actualizada`);
       },
     },
     {
@@ -107,10 +108,11 @@ export function registerSuiteTools(client: TreeflowClient) {
     {
       name: 'treeflow_run_test_suite',
       description:
-        'Ejecuta la suite completa contra el motor del bot y devuelve el resultado (totales y detalle por caso). ' +
-        'Corre en la misma petición. Reentrena antes si cambiaste intenciones o entidades, o fallará por el modelo viejo.',
+        'Ejecuta la suite completa contra el motor del bot y devuelve los totales y el detalle sólo de lo que falló ' +
+        '(lo que pasó no se repite; el detalle completo está en treeflow_get_test_run). Corre en la misma petición. ' +
+        'Reentrena antes si cambiaste intenciones o entidades, o fallará por el modelo viejo.',
       inputSchema: { type: 'object', properties: { suite_id: { type: 'string' } }, required: ['suite_id'] },
-      handler: async (a: { suite_id: string }) => ok(await client.runTestSuite(a.suite_id)),
+      handler: async (a: { suite_id: string }) => ok(testRunSummary(await client.runTestSuite(a.suite_id))),
     },
     {
       name: 'treeflow_list_test_runs',

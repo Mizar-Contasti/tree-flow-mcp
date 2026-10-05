@@ -1,4 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { ok } from './util.js';
 
 export function registerVoiceTools(client: TreeflowClient) {
   return [
@@ -14,9 +15,7 @@ export function registerVoiceTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string }) => {
         const result = await client.getVoiceConfig(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
     {
@@ -39,9 +38,7 @@ export function registerVoiceTools(client: TreeflowClient) {
       handler: async (args: { tree_id: string; [key: string]: any }) => {
         const { tree_id, ...data } = args;
         const result = await client.updateVoiceConfig(tree_id, data);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
   ];

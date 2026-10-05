@@ -1,3 +1,5 @@
+import { maskSecrets } from '../client/treeflowClient.js';
+import { ok } from './util.js';
 export function registerIntegrationTools(client) {
     return [
         {
@@ -10,17 +12,13 @@ export function registerIntegrationTools(client) {
                 },
                 required: ['tree_id'],
             },
-            handler: async (args) => {
-                const result = await client.listIntegrations(args.tree_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
-            },
+            handler: async (args) => ok(maskSecrets(await client.listIntegrations(args.tree_id))),
         },
         {
             name: 'treeflow_configure_integration',
             description: 'Activa, desactiva o ajusta un canal del bot. config se combina con lo guardado: manda sólo las claves que ' +
-                'cambian, con los mismos nombres que muestra treeflow_list_integrations (ej. web: {"primaryColor": "#0a0"}). ' +
+                'cambian, con los mismos nombres que muestra treeflow_list_integrations (ej. web: {"primaryColor": "#0a0"}); ' +
+                'una clave en null se borra. ' +
                 'El token de Telegram no se configura aquí: se conecta desde el panel de Treeflow, que registra el webhook.',
             inputSchema: {
                 type: 'object',
@@ -34,9 +32,9 @@ export function registerIntegrationTools(client) {
             },
             handler: async (args) => {
                 const result = await client.configureIntegration(args.tree_id, args.integration_key, args.enabled, args.config);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                // El backend devuelve todos los canales: basta con el que se tocó.
+                const channel = result?.injertos?.[args.integration_key];
+                return ok(`Canal ${args.integration_key} guardado: ${JSON.stringify(maskSecrets(channel ?? null))}`);
             },
         },
     ];

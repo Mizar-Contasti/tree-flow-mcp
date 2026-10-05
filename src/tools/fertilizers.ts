@@ -1,5 +1,5 @@
 import { TreeflowClient, maskSecrets } from '../client/treeflowClient.js';
-import { fertilizersSummary, toolLogsSummary } from './resumen.js';
+import { fertilizersSummary, scriptLine, toolLine, toolLogsSummary } from './resumen.js';
 import { ok, variableSchema } from './util.js';
 
 const TOOL_NOTE =
@@ -49,7 +49,7 @@ export function registerFertilizerTools(client: TreeflowClient) {
       },
       handler: async (a: any) => {
         const { tree_id, ...input } = a;
-        return ok(maskSecrets(await client.createTool(tree_id, input)));
+        return ok(`API creada: ${toolLine(await client.createTool(tree_id, input))}`);
       },
     },
     {
@@ -81,7 +81,7 @@ export function registerFertilizerTools(client: TreeflowClient) {
       },
       handler: async (a: any) => {
         const { tree_id, tool_id, ...patch } = a;
-        return ok(maskSecrets(await client.updateTool(tree_id, tool_id, patch)));
+        return ok(`API actualizada: ${toolLine(await client.updateTool(tree_id, tool_id, patch))}`);
       },
     },
     {
@@ -158,7 +158,7 @@ export function registerFertilizerTools(client: TreeflowClient) {
       },
       handler: async (a: any) => {
         const { tree_id, ...input } = a;
-        return ok(await client.createScript(tree_id, input));
+        return ok(`Script creado: ${scriptLine(await client.createScript(tree_id, input))}`);
       },
     },
     {
@@ -184,7 +184,7 @@ export function registerFertilizerTools(client: TreeflowClient) {
       },
       handler: async (a: any) => {
         const { tree_id, script_id, ...patch } = a;
-        return ok(await client.updateScript(tree_id, script_id, patch));
+        return ok(`Script actualizado: ${scriptLine(await client.updateScript(tree_id, script_id, patch))}`);
       },
     },
     {

@@ -1,3 +1,4 @@
+import { ok } from './util.js';
 export function registerTrainingTools(client) {
     return [
         {
@@ -12,9 +13,7 @@ export function registerTrainingTools(client) {
             },
             handler: async (args) => {
                 const result = await client.triggerTraining(args.tree_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
         {
@@ -29,9 +28,7 @@ export function registerTrainingTools(client) {
             },
             handler: async (args) => {
                 const status = await client.getTrainingStatus(args.tree_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(status, null, 2) }],
-                };
+                return ok(status);
             },
         },
     ];

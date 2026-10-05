@@ -17,6 +17,11 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            limit?: undefined;
+            offset?: undefined;
+            intent?: undefined;
+            start_date?: undefined;
+            end_date?: undefined;
         };
         required: string[];
     };
@@ -40,13 +45,37 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            message?: undefined;
+            limit: {
+                type: string;
+                description: string;
+            };
+            offset: {
+                type: string;
+                description: string;
+            };
+            intent: {
+                type: string;
+                description: string;
+            };
+            message: {
+                type: string;
+                description: string;
+            };
+            start_date: {
+                type: string;
+                description: string;
+            };
+            end_date: {
+                type: string;
+                description: string;
+            };
             session_id?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         tree_id: string;
+        [key: string]: any;
     }) => Promise<{
         content: {
             type: string;
@@ -68,6 +97,11 @@ export declare function registerDiagnosticTools(client: TreeflowClient): ({
                 description: string;
             };
             message?: undefined;
+            limit?: undefined;
+            offset?: undefined;
+            intent?: undefined;
+            start_date?: undefined;
+            end_date?: undefined;
         };
         required: string[];
     };

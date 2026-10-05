@@ -140,11 +140,21 @@ Listo cuando: en dev, cambiar sólo el `messageText` de una hoja conserva sus
 `intents`, su `nextLeafId` y sus `customResponses`.
 
 ### Fase 3 — Respuestas cortas
-- [ ] Todas las respuestas en JSON compacto, por una sola función.
-- [ ] Las escrituras devuelven un acuse corto (ID, nombre y lo imprescindible para el
-      siguiente paso; por ejemplo, la hoja Start de una rama nueva).
-- [ ] Topes por defecto en conversaciones y mesa de ayuda.
-- [ ] Revisar el tamaño de `simulate_message`, `get_conversation` y `run_test_suite`.
+- [x] Todas las respuestas en JSON compacto, por una sola función (`ok()`).
+- [x] Las escrituras devuelven una línea con el ID y lo imprescindible para el siguiente
+      paso: `create_branch` trae su hoja Start, `create_leaf`/`update_leaf` la línea de la
+      hoja, intenciones/entidades/plantillas/APIs/scripts su línea de resumen,
+      `configure_integration` sólo el canal tocado.
+- [x] `list_trees` y `get_tree` sin la configuración del widget (está en
+      `list_integrations`).
+- [x] Topes por defecto: 20 conversaciones (con filtros) y 20 atenciones.
+- [x] `simulate_message`: lo que contestó, intención, confianza, hoja, parámetros y
+      `session_id`; sin sentimiento, STT ni candidatos repetidos (2,024 → 490 car.).
+      `get_conversation`: un turno por línea. `run_test_suite`: totales y sólo lo que
+      falló.
+
+Efecto colateral: el catálogo creció de 48,131 a 52,686 caracteres con los parámetros y
+descripciones nuevos de las fases 1–3. Recortarlo es la fase 5.
 
 Listo cuando: ninguna escritura devuelve el objeto completo y ningún listado es ilimitado.
 
@@ -178,7 +188,7 @@ Listo cuando: el catálogo por defecto ronda los 5,000 tokens.
 | 0 | hecha | Línea base medida contra la API real; `npm test` y `npm run medir` |
 | 1 | hecha | `get_tree_data` 426,573 → 41,347 car. (9.7%); `export_tree` 14.6 M → 339; ninguna otra lectura pasa de 9,400 |
 | 2 | hecha | `scripts/e2e-dev.mjs` pasa contra dev: editar una clave conserva las demás en hojas, intenciones, entidades y canales |
-| 3 | pendiente | |
+| 3 | hecha | Escrituras de 350–850 a 90–230 car.; `simulate_message` 2,024 → 490; `list_trees` 3,691 → 444 |
 | 4 | pendiente | |
 | 5 | pendiente | |
 | 6 | pendiente | |

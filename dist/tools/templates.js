@@ -1,4 +1,4 @@
-import { DETAIL_HINT, templatesSummary } from './resumen.js';
+import { DETAIL_HINT, templateLine, templatesSummary } from './resumen.js';
 import { ok } from './util.js';
 export function registerTemplateTools(client) {
     return [
@@ -40,9 +40,7 @@ export function registerTemplateTools(client) {
                     description: args.description,
                     responses: args.responses || [{ type: 'text', text: args.text || args.name }],
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(`Plantilla creada: ${templateLine(result)}`);
             },
         },
         {
@@ -67,9 +65,7 @@ export function registerTemplateTools(client) {
                     description: args.description,
                     responses: args.responses,
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(`Plantilla actualizada: ${templateLine(result)}`);
             },
         },
         {
@@ -84,9 +80,7 @@ export function registerTemplateTools(client) {
             },
             handler: async (args) => {
                 const result = await client.deleteMessageTemplate(args.template_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
     ];

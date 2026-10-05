@@ -1,4 +1,4 @@
-import { branchesSummary } from './resumen.js';
+import { branchLine, branchOutline, branchesSummary, canvasNames } from './resumen.js';
 import { ok } from './util.js';
 export function registerBranchTools(client) {
     return [
@@ -34,9 +34,8 @@ export function registerBranchTools(client) {
                     description: args.description,
                     is_default: args.is_default,
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                // Con su hoja Start: es el ID que hace falta para seguir armando la rama.
+                return ok(`Rama creada:\n${branchOutline(result, canvasNames([result]))}`);
             },
         },
         {
@@ -58,9 +57,7 @@ export function registerBranchTools(client) {
                     description: args.description,
                     is_default: args.is_default,
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(`Rama actualizada: ${branchLine(result, canvasNames([result]))}`);
             },
         },
         {
@@ -75,9 +72,7 @@ export function registerBranchTools(client) {
             },
             handler: async (args) => {
                 const result = await client.deleteBranch(args.branch_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
     ];

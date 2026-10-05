@@ -1,26 +1,26 @@
-import { TreeflowClient } from '../client/treeflowClient.js';
-import { treeOutline } from './resumen.js';
+import { TreeflowClient, maskSecrets } from '../client/treeflowClient.js';
+import { treeHeader, treeOutline, withoutNoise } from './resumen.js';
 import { ok } from './util.js';
 
 export function registerTreeTools(client: TreeflowClient) {
   return [
     {
       name: 'treeflow_list_trees',
-      description: 'Lista todos los bots (árboles) disponibles en el espacio de trabajo actual de Treeflow.',
+      description: 'Lista los bots (árboles) del espacio de trabajo: nombre, ID, propósito, idioma y modo NLP.',
       inputSchema: {
         type: 'object',
         properties: {},
       },
       handler: async () => {
-        const trees = await client.listTrees();
-        return {
-          content: [{ type: 'text', text: JSON.stringify(trees, null, 2) }],
-        };
+        const trees: any[] = await client.listTrees();
+        return ok([`Bots (${trees.length}):`, ...trees.map((t) => `- ${treeHeader(t)}`)].join('\n'));
       },
     },
     {
       name: 'treeflow_get_tree',
-      description: 'Obtiene los detalles completos, configuración y propósito de un bot (árbol) por su ID.',
+      description:
+        'Configuración de un bot: propósito, idiomas, modo NLP, umbrales y orden de detección. Los canales sólo se ' +
+        'nombran; su configuración está en treeflow_list_integrations.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -29,10 +29,11 @@ export function registerTreeTools(client: TreeflowClient) {
         required: ['tree_id'],
       },
       handler: async (args: { tree_id: string }) => {
-        const tree = await client.getTree(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(tree, null, 2) }],
-        };
+        const { injertos, ...tree } = await client.getTree(args.tree_id);
+        const canales = Object.entries(injertos ?? {}).map(([k, v]: [string, any]) =>
+          `${k}${v === true || v?.enabled ? '' : ' (inactivo)'}`
+        );
+        return ok({ ...maskSecrets(withoutNoise(tree)), canales });
       },
     },
     {
@@ -63,12 +64,8 @@ export function registerTreeTools(client: TreeflowClient) {
         },
         required: ['name'],
       },
-      handler: async (args: { name: string; description?: string; purpose?: string; primary_language?: string }) => {
-        const result = await client.createTree(args);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
-      },
+      handler: async (args: { name: string; description?: string; purpose?: string; primary_language?: string }) =>
+        ok(`Bot creado: ${treeHeader(await client.createTree(args))}`),
     },
     {
       name: 'treeflow_update_tree',
@@ -92,9 +89,7 @@ export function registerTreeTools(client: TreeflowClient) {
       handler: async (args: { tree_id: string; [key: string]: any }) => {
         const { tree_id, ...data } = args;
         const result = await client.updateTree(tree_id, data);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Bot actualizado (${Object.keys(data).join(', ') || 'sin cambios'}): ${treeHeader(result)}`);
       },
     },
   ];

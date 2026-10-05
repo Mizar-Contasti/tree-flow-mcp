@@ -1,4 +1,4 @@
-import { DETAIL_HINT, intentsSummary } from './resumen.js';
+import { DETAIL_HINT, intentLine, intentsSummary } from './resumen.js';
 import { ok } from './util.js';
 export function registerIntentTools(client) {
     return [
@@ -53,9 +53,7 @@ export function registerIntentTools(client) {
                     entities: args.entities,
                     type: args.type || 'conversational',
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(`Intención creada: ${intentLine(result)}`);
             },
         },
         {
@@ -97,9 +95,7 @@ export function registerIntentTools(client) {
                     add_patterns: args.add_patterns,
                     remove_patterns: args.remove_patterns,
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(`Intención actualizada: ${intentLine(result)}`);
             },
         },
         {
@@ -115,9 +111,7 @@ export function registerIntentTools(client) {
             },
             handler: async (args) => {
                 const result = await client.deleteIntent(args.tree_id, args.intent_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
     ];

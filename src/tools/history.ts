@@ -61,9 +61,7 @@ export function registerHistoryTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string }) => {
         const result = await client.listBackups(args.tree_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
     {
@@ -79,9 +77,7 @@ export function registerHistoryTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string; note?: string }) => {
         const result = await client.createBackup(args.tree_id, args.note);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
     {
@@ -103,9 +99,7 @@ export function registerHistoryTools(client: TreeflowClient) {
       handler: async (args: any) => {
         const { tree_id, ...params } = args;
         const result = await client.getConversationAnalytics(tree_id, params);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
   ];

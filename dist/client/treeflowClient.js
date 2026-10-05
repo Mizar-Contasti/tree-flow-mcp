@@ -679,8 +679,7 @@ export class TreeflowClient {
         const injertos = { ...(current.injertos || {}) };
         const existing = injertos[integrationKey];
         injertos[integrationKey] = {
-            ...(existing && typeof existing === 'object' ? existing : {}),
-            ...(config && typeof config === 'object' ? config : {}),
+            ...mergeConfig(existing && typeof existing === 'object' ? existing : {}, withoutMasked(config && typeof config === 'object' ? config : {})),
             enabled,
         };
         const response = await this.client.put(`/bots/${treeId}/injertos`, injertos);
@@ -722,8 +721,9 @@ export class TreeflowClient {
         });
         return response.data;
     }
-    async listConversations(treeId) {
-        const response = await this.client.get(`/api/trees/${treeId}/conversations`);
+    // Sin limit el backend devuelve todas las conversaciones del bot.
+    async listConversations(treeId, params = {}) {
+        const response = await this.client.get(`/api/trees/${treeId}/conversations`, { params: { limit: 20, ...pickDefined(params) } });
         return response.data;
     }
     async getConversation(treeId, sessionId) {

@@ -1,3 +1,4 @@
+import { ok } from './util.js';
 export function registerUserTools(client) {
     return [
         {
@@ -9,9 +10,7 @@ export function registerUserTools(client) {
             },
             handler: async () => {
                 const users = await client.listUsers();
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(users, null, 2) }],
-                };
+                return ok(users);
             },
         },
         {
@@ -29,9 +28,7 @@ export function registerUserTools(client) {
             },
             handler: async (args) => {
                 const result = await client.createUser(args);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
         {
@@ -51,9 +48,7 @@ export function registerUserTools(client) {
                     role: args.role,
                     is_active: args.is_active,
                 });
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
         {
@@ -65,9 +60,7 @@ export function registerUserTools(client) {
             },
             handler: async () => {
                 const result = await client.listCredentials();
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
     ];

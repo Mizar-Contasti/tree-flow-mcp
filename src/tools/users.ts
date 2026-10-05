@@ -1,4 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { ok } from './util.js';
 
 export function registerUserTools(client: TreeflowClient) {
   return [
@@ -11,9 +12,7 @@ export function registerUserTools(client: TreeflowClient) {
       },
       handler: async () => {
         const users = await client.listUsers();
-        return {
-          content: [{ type: 'text', text: JSON.stringify(users, null, 2) }],
-        };
+        return ok(users);
       },
     },
     {
@@ -31,9 +30,7 @@ export function registerUserTools(client: TreeflowClient) {
       },
       handler: async (args: { username: string; email: string; role: string; name?: string }) => {
         const result = await client.createUser(args);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
     {
@@ -53,9 +50,7 @@ export function registerUserTools(client: TreeflowClient) {
           role: args.role,
           is_active: args.is_active,
         });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
     {
@@ -67,9 +62,7 @@ export function registerUserTools(client: TreeflowClient) {
       },
       handler: async () => {
         const result = await client.listCredentials();
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
   ];

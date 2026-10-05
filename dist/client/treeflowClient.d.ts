@@ -252,7 +252,14 @@ export declare class TreeflowClient {
     getTrainingStatus(treeId: string): Promise<any>;
     listTrainingHistory(treeId: string, page?: number, pageSize?: number): Promise<any>;
     simulateChatMessage(treeId: string, message: string, sessionId?: string): Promise<any>;
-    listConversations(treeId: string): Promise<any>;
+    listConversations(treeId: string, params?: {
+        limit?: number;
+        offset?: number;
+        intent?: string;
+        message?: string;
+        start_date?: number;
+        end_date?: number;
+    }): Promise<any>;
     getConversation(treeId: string, sessionId: string): Promise<any>;
     listChangeHistory(treeId: string, params?: {
         limit?: number;

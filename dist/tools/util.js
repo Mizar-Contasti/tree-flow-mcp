@@ -1,7 +1,8 @@
-// Respuesta estándar de una herramienta: el resultado como JSON legible.
+// Respuesta estándar de una herramienta. JSON compacto: la sangría no le sirve al modelo
+// y engordaba cada respuesta un 50%, que se pagaba en cada llamada siguiente.
 export function ok(result) {
     return {
-        content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result) }],
     };
 }
 // Esquema reutilizable de variables de entrada/salida de herramientas y scripts.

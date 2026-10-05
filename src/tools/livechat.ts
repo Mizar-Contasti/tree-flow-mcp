@@ -22,11 +22,11 @@ export function registerLiveChatTools(client: TreeflowClient) {
           hasta: { type: 'string', description: 'Fecha final ISO 8601' },
           estado: { type: 'string' },
           q: { type: 'string', description: 'Texto a buscar' },
-          limit: { type: 'integer', description: 'Default 50' },
+          limit: { type: 'integer', description: 'Default 20' },
           offset: { type: 'integer' },
         },
       },
-      handler: async (a: any) => ok(await client.getLiveChatHistory(a)),
+      handler: async (a: any) => ok(await client.getLiveChatHistory({ limit: 20, ...a })),
     },
     {
       name: 'treeflow_get_live_chat_session',

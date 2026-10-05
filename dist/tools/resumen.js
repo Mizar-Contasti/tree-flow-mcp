@@ -11,7 +11,12 @@ export function clip(value, max = 60) {
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 const list = (items, max = 8) => items.length > max ? `${items.slice(0, max).join(', ')} y ${items.length - max} más` : items.join(', ');
-const when = (iso) => (typeof iso === 'string' ? iso.slice(0, 16).replace('T', ' ') : '?');
+/** Fecha legible desde ISO o desde un número Unix (en segundos o en milisegundos). */
+const when = (value) => {
+    if (typeof value === 'number')
+        value = new Date(value > 1e12 ? value : value * 1000).toISOString();
+    return typeof value === 'string' ? value.slice(0, 16).replace('T', ' ') : '?';
+};
 export function canvasNames(branches, templates = []) {
     return {
         leaves: new Map(branches.flatMap((b) => (b.leaves ?? []).map((l) => [l.id, l.name]))),
@@ -153,30 +158,137 @@ export function treeOutline(data) {
 }
 // ── Herramientas del bot: APIs y scripts ─────────────────────────────────────
 const varNames = (vars) => (vars ?? []).map((v) => v?.name).filter(Boolean);
+function ioParts(x) {
+    const parts = [];
+    const ins = varNames(x.inputVariables);
+    const outs = varNames(x.outputVariables);
+    if (ins.length)
+        parts.push(`entradas: ${list(ins)}`);
+    if (outs.length)
+        parts.push(`salidas: ${list(outs)}`);
+    return parts;
+}
+const stateParts = (x) => [x.status ? `estado ${x.status}` : '', x.enabled === false ? 'desactivada' : ''].filter(Boolean);
+export const toolLine = (t) => [`- ${t.name} [${t.id}] ${t.method ?? 'POST'} ${clip(maskUrl(t.url ?? ''), 80)}`, ...stateParts(t), ...ioParts(t)].join(' · ');
+export const scriptLine = (s) => [`- ${s.name} [${s.id}] ${s.language ?? 'python'}`, ...stateParts(s), ...ioParts(s)].join(' · ');
 export function fertilizersSummary(config) {
     const tools = config?.additionalFertilizers ?? config?.additional_tools ?? [];
     // El backend devuelve los scripts dos veces (scripts y custom_scripts): se usa uno.
     const scripts = config?.scripts ?? config?.custom_scripts ?? [];
     const main = config?.mainFertilizer;
-    const io = (x) => {
-        const parts = [];
-        const ins = varNames(x.inputVariables);
-        const outs = varNames(x.outputVariables);
-        if (ins.length)
-            parts.push(`entradas: ${list(ins)}`);
-        if (outs.length)
-            parts.push(`salidas: ${list(outs)}`);
-        return parts;
-    };
-    const state = (x) => [x.status ? `estado ${x.status}` : '', x.enabled === false ? 'desactivada' : ''].filter(Boolean);
     return [
         main ? `Webhook principal: ${main.enabled ? 'activo' : 'inactivo'}${main.url ? ` · ${clip(maskUrl(main.url), 80)}` : ''}` : 'Webhook principal: no configurado',
         `APIs (${tools.length}):`,
-        ...tools.map((t) => [`- ${t.name} [${t.id}] ${t.method ?? 'POST'} ${clip(maskUrl(t.url ?? ''), 80)}`, ...state(t), ...io(t)].join(' · ')),
+        ...tools.map(toolLine),
         `Scripts (${scripts.length}):`,
-        ...scripts.map((s) => [`- ${s.name} [${s.id}] ${s.language ?? 'python'}`, ...state(s), ...io(s)].join(' · ')),
+        ...scripts.map(scriptLine),
         DETAIL_HINT.replace('tipo', 'tipo "tool" o "script"'),
     ].join('\n');
+}
+// ── Simulación y conversaciones ──────────────────────────────────────────────
+/** Lo que dijo el bot en un turno, sea texto o bloque enriquecido. */
+function botSaid(r, max) {
+    const resp = r?.response ?? r?.candidates?.[0]?.response;
+    if (resp == null)
+        return '(sin respuesta)';
+    if (typeof resp === 'string')
+        return `"${clip(resp, max)}"`;
+    const value = resp.value ?? resp.text;
+    if (resp.type === 'text' || typeof value === 'string')
+        return `"${clip(value, max)}"`;
+    return `[${resp.type ?? 'bloque'}] ${clip(JSON.stringify(value ?? resp), max)}`;
+}
+// Variables que pone el motor solo y que no dicen nada del flujo.
+const SYSTEM_PARAMS = new Set(['last_utterance', 'last_no_match']);
+const paramValues = (params) => Object.entries(params ?? {})
+    .filter(([k]) => !SYSTEM_PARAMS.has(k))
+    .map(([k, p]) => `${k}=${clip(p?.key_value ?? p?.original_value ?? p, 40)}`);
+/** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
+export function simulationSummary(r) {
+    const lines = [`Bot: ${botSaid(r, 600)}`];
+    const why = [r?.intent ? `intención ${r.intent}` : 'sin intención'];
+    if (typeof r?.confidence === 'number')
+        why.push(`confianza ${r.confidence.toFixed(2)}`);
+    if (r?.matching_type)
+        why.push(r.matching_type);
+    const node = r?.state?.current_node;
+    if (node)
+        why.push(`hoja ${node}${r?.state?.current_node_id ? ` [${r.state.current_node_id}]` : ''}`);
+    lines.push(why.join(' · '));
+    const params = paramValues(r?.parameters);
+    if (params.length)
+        lines.push(`parámetros del turno: ${params.join(', ')}`);
+    const session = paramValues(r?.session_parameters).filter((p) => !params.includes(p));
+    if (session.length)
+        lines.push(`en la sesión: ${session.join(', ')}`);
+    if (r?.slot_filling?.active)
+        lines.push(`slot filling: pidiendo ${r.slot_filling.parameter ?? '?'}`);
+    if (r?.session_id)
+        lines.push(`session_id: ${r.session_id} (mándalo en el siguiente mensaje para seguir esta conversación)`);
+    return lines.join('\n');
+}
+export function conversationsList(convs) {
+    return [
+        `Conversaciones (${convs.length}):`,
+        ...convs.map((c) => {
+            const parts = [`- ${c.session_id} · ${when(c.updated_at)} · ${c.turns_count ?? '?'} turnos`];
+            if (c.intents?.length)
+                parts.push(`intenciones: ${list(c.intents, 5)}`);
+            if (c.first_message)
+                parts.push(`empieza "${clip(c.first_message, 50)}"`);
+            if (c.escalation_suggested)
+                parts.push('sugiere pasar a una persona');
+            return parts.join(' · ');
+        }),
+        'Los turnos de una: treeflow_get_conversation.',
+    ].join('\n');
+}
+export function conversationSummary(conv) {
+    const turns = conv?.turns ?? [];
+    return [
+        `Conversación ${conv?.session_id} · ${turns.length} turnos${conv?.escalation_suggested ? ' · sugiere pasar a una persona' : ''}`,
+        ...turns.map((t) => {
+            const r = t.response ?? {};
+            const meta = [r.intent ? `intención ${r.intent}` : '', r.state?.current_node ? `hoja ${r.state.current_node}` : ''].filter(Boolean);
+            return `- usuario: "${clip(t.user_input ?? t.request?.value, 120)}" → bot: ${botSaid(r, 200)}${meta.length ? ` (${meta.join(', ')})` : ''}`;
+        }),
+    ].join('\n');
+}
+// ── Suites de prueba ─────────────────────────────────────────────────────────
+export function suiteLine(suite) {
+    const cases = suite.total_casos ?? suite.cases?.length ?? 0;
+    const turns = suite.total_turnos !== undefined ? `, ${suite.total_turnos} turnos` : '';
+    return `Suite "${suite.name}" [${suite.id}] · ${cases} casos${turns}`;
+}
+/** Totales y sólo lo que falló: lo que pasó no hace falta leerlo. */
+export function testRunSummary(run) {
+    const t = run?.totals ?? {};
+    const lines = [
+        `Ejecución [${run?.id}] · ${run?.status} · ${t.casos_ok ?? '?'}/${t.casos ?? '?'} casos bien · ${t.asserts_ok ?? '?'}/${t.asserts ?? '?'} comprobaciones bien`,
+    ];
+    if (run?.error_message)
+        lines.push(`error: ${clip(run.error_message, 200)}`);
+    const failed = (run?.results ?? []).filter((c) => !c.ok);
+    if (failed.length)
+        lines.push('Fallaron:');
+    for (const c of failed) {
+        lines.push(`- ${c.nombre}`);
+        for (const turn of c.turnos ?? []) {
+            const bad = (turn.comprobaciones ?? []).filter((v) => !v.ok);
+            if (!bad.length && !turn.error)
+                continue;
+            lines.push(`  · "${clip(turn.mensaje, 80)}" → ${botSaid({ response: turn.respuesta }, 120)}`);
+            if (turn.error)
+                lines.push(`    error: ${clip(turn.error, 160)}`);
+            for (const v of bad) {
+                const what = v.tipo === 'parametro' ? `parametro ${v.nombre}` : v.tipo;
+                lines.push(`    ${what}: esperaba ${JSON.stringify(v.esperado)}, obtuvo ${JSON.stringify(v.obtenido)}${v.error ? ` (${v.error})` : ''}`);
+            }
+        }
+    }
+    if (!failed.length && (run?.results ?? []).length)
+        lines.push('Todos los casos pasaron.');
+    return lines.join('\n');
 }
 // ── Historiales ──────────────────────────────────────────────────────────────
 /** Campos de primer nivel que cambiaron entre `before` y `after`. */

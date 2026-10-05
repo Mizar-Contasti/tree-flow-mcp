@@ -1,5 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { DETAIL_HINT, entitiesSummary } from './resumen.js';
+import { DETAIL_HINT, entitiesSummary, entityLine } from './resumen.js';
 import { ok } from './util.js';
 
 export function registerEntityTools(client: TreeflowClient) {
@@ -52,9 +52,7 @@ export function registerEntityTools(client: TreeflowClient) {
           values: args.values || [],
           pattern: args.pattern,
         });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Entidad creada: ${entityLine(result)}`);
       },
     },
     {
@@ -115,9 +113,7 @@ export function registerEntityTools(client: TreeflowClient) {
           add_values: args.add_values,
           remove_values: args.remove_values,
         });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Entidad actualizada: ${entityLine(result)}`);
       },
     },
     {
@@ -133,9 +129,7 @@ export function registerEntityTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string; entity_id: string }) => {
         const result = await client.deleteEntity(args.tree_id, args.entity_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
   ];

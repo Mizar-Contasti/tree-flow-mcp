@@ -36,6 +36,11 @@ if (!tree) {
 }
 const T = tree.tree_id;
 console.log(`Bot de pruebas: ${T}`);
+
+// Restos de una corrida anterior que falló a medias
+for (const b of await client.listBranches(T)) if (b.name.startsWith('Rama e2e ')) await client.deleteBranch(b.id);
+for (const s of await client.listTestSuites(T)) if (s.name.startsWith('Suite e2e ')) await client.deleteTestSuite(s.id);
+
 const branches = await client.listBranches(T);
 const leaves = branches.flatMap((b) => (b.leaves ?? []).map((l) => ({ ...l, branchId: b.id })));
 assert.ok(leaves.length, 'el bot de pruebas no tiene hojas');
@@ -97,5 +102,53 @@ assert.equal(webAfter.config, undefined, 'no debe anidar config');
 for (const [k, v] of Object.entries(web)) if (k !== 'widgetSubtitle') assert.deepEqual(webAfter[k], v, `configure_integration cambió web.${k}`);
 await call('configure_integration', { tree_id: T, integration_key: 'web', enabled: web.enabled ?? false, config: { widgetSubtitle: web.widgetSubtitle ?? null } });
 step('configure_integration cambió una clave de web sin anidar ni borrar las demás');
+
+// ── Fase 3: respuestas cortas que sirven para el paso siguiente ──
+const sizes = {};
+const measured = async (name, args) => {
+  const text = await call(name, args);
+  sizes[name] = Math.max(sizes[name] ?? 0, text.length);
+  return text;
+};
+const sim1 = await measured('simulate_message', { tree_id: T, message: 'hola' });
+const sid = sim1.match(/session_id: (\S+)/)?.[1];
+assert.ok(sim1.startsWith('Bot: ') && sid, 'la simulación debe decir qué contestó y dar el session_id');
+const sim2 = await measured('simulate_message', { tree_id: T, message: 'quiero hacer un pedido', session_id: sid });
+assert.ok(sim2.includes(`session_id: ${sid}`), 'el segundo turno sigue en la misma sesión');
+step(`simulate_message: dos turnos en la sesión ${sid}`);
+
+const conv = await measured('get_conversation', { tree_id: T, session_id: sid });
+assert.match(conv, /2 turnos/);
+assert.match(await measured('list_conversations', { tree_id: T }), /^Conversaciones \(/);
+step('get_conversation resume la sesión turno a turno');
+
+const rama = await measured('create_branch', { tree_id: T, name: `Rama e2e ${Date.now()}` });
+const branchId = rama.match(/Rama "[^"]+" \[([^\]]+)\]/)?.[1];
+const startId = rama.match(/- Start \([^)]*\) \[([^\]]+)\]/)?.[1];
+assert.ok(branchId && startId, 'create_branch debe devolver el ID de la rama y el de su hoja Start');
+const hoja = await measured('create_leaf', { branch_id: branchId, leaf_type: 'message', name: 'Hoja e2e', config: { messageText: 'hola' } });
+const leafId = hoja.match(/\[([^\]]+)\]/)?.[1];
+assert.ok((await measured('update_leaf', { leaf_id: leafId, branch_id: branchId, config: { nextLeafId: startId } })).endsWith(`→ ${startId}`));
+await call('delete_leaf', { leaf_id: leafId });
+await call('delete_branch', { branch_id: branchId });
+step('create_branch, create_leaf y update_leaf devuelven una línea con lo necesario (y se limpiaron)');
+
+const suite = await measured('create_test_suite', {
+  tree_id: T, name: `Suite e2e ${Date.now()}`,
+  cases: [
+    { nombre: 'Saludo', turnos: [{ mensaje: 'hola', asserts: [{ tipo: 'intencion', valor: 'saludo' }] }] },
+    { nombre: 'Falla a propósito', turnos: [{ mensaje: 'hola', asserts: [{ tipo: 'intencion', valor: 'no_existe' }] }] },
+  ],
+});
+const suiteId = suite.match(/\[([^\]]+)\]/)?.[1];
+const run = await measured('run_test_suite', { suite_id: suiteId });
+assert.match(run, /1\/2 casos bien/);
+assert.match(run, /Falla a propósito/);
+assert.ok(!run.includes('- Saludo'), 'lo que pasó no se repite');
+await call('delete_test_suite', { suite_id: suiteId });
+step('run_test_suite devuelve los totales y sólo el caso que falló (la suite se borró)');
+
+console.log('\nTamaño de las respuestas (caracteres):');
+for (const [k, v] of Object.entries(sizes)) console.log(`  ${k.padEnd(20)} ${v}`);
 
 console.log('\nTodo bien.');

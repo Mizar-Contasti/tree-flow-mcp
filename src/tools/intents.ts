@@ -1,5 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { DETAIL_HINT, intentsSummary } from './resumen.js';
+import { DETAIL_HINT, intentLine, intentsSummary } from './resumen.js';
 import { ok } from './util.js';
 
 export function registerIntentTools(client: TreeflowClient) {
@@ -57,9 +57,7 @@ export function registerIntentTools(client: TreeflowClient) {
           entities: args.entities,
           type: args.type || 'conversational',
         });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Intención creada: ${intentLine(result)}`);
       },
     },
     {
@@ -110,9 +108,7 @@ export function registerIntentTools(client: TreeflowClient) {
           add_patterns: args.add_patterns,
           remove_patterns: args.remove_patterns,
         });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Intención actualizada: ${intentLine(result)}`);
       },
     },
     {
@@ -128,9 +124,7 @@ export function registerIntentTools(client: TreeflowClient) {
       },
       handler: async (args: { tree_id: string; intent_id: string }) => {
         const result = await client.deleteIntent(args.tree_id, args.intent_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
   ];

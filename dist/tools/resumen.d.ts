@@ -26,7 +26,16 @@ export declare function treeOutline(data: {
     entities: any[];
     templates: any[];
 }): string;
+export declare const toolLine: (t: any) => string;
+export declare const scriptLine: (s: any) => string;
 export declare function fertilizersSummary(config: any): string;
+/** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
+export declare function simulationSummary(r: any): string;
+export declare function conversationsList(convs: any[]): string;
+export declare function conversationSummary(conv: any): string;
+export declare function suiteLine(suite: any): string;
+/** Totales y sólo lo que falló: lo que pasó no hace falta leerlo. */
+export declare function testRunSummary(run: any): string;
 /** Campos de primer nivel que cambiaron entre `before` y `after`. */
 export declare function changedFields(changes: any): string[];
 export declare function changeLine(entry: any): string;

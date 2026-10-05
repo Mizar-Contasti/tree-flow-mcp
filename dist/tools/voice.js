@@ -1,3 +1,4 @@
+import { ok } from './util.js';
 export function registerVoiceTools(client) {
     return [
         {
@@ -12,9 +13,7 @@ export function registerVoiceTools(client) {
             },
             handler: async (args) => {
                 const result = await client.getVoiceConfig(args.tree_id);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
         {
@@ -37,9 +36,7 @@ export function registerVoiceTools(client) {
             handler: async (args) => {
                 const { tree_id, ...data } = args;
                 const result = await client.updateVoiceConfig(tree_id, data);
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-                };
+                return ok(result);
             },
         },
     ];

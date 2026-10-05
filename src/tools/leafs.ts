@@ -1,5 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { DETAIL_HINT, branchOutline, canvasNames } from './resumen.js';
+import { DETAIL_HINT, branchOutline, canvasNames, leafLine } from './resumen.js';
 import { ok } from './util.js';
 
 export function registerLeafTools(client: TreeflowClient) {
@@ -59,9 +59,7 @@ export function registerLeafTools(client: TreeflowClient) {
           position_y: args.position_y,
           is_start: args.is_start,
         });
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Hoja creada: ${leafLine(result, canvasNames([]))}`);
       },
     },
     {
@@ -110,9 +108,7 @@ export function registerLeafTools(client: TreeflowClient) {
           },
           { branchId: args.branch_id, treeId: args.tree_id, replaceConfig: args.replace_config }
         );
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(`Hoja actualizada: ${leafLine(result, canvasNames([]))}`);
       },
     },
     {
@@ -127,9 +123,7 @@ export function registerLeafTools(client: TreeflowClient) {
       },
       handler: async (args: { leaf_id: string }) => {
         const result = await client.deleteLeaf(args.leaf_id);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-        };
+        return ok(result);
       },
     },
   ];
