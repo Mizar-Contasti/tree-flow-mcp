@@ -63,20 +63,5 @@ export function registerBranchTools(client: TreeflowClient) {
         return ok(`Rama actualizada: ${branchLine(result, canvasNames([result]))}`);
       },
     },
-    {
-      name: 'treeflow_delete_branch',
-      description: 'Elimina una rama y todos sus nodos asociados.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          branch_id: { type: 'string', description: 'ID de la rama a eliminar' },
-        },
-        required: ['branch_id'],
-      },
-      handler: async (args: { branch_id: string }) => {
-        const result = await client.deleteBranch(args.branch_id);
-        return ok(result);
-      },
-    },
   ];
 }

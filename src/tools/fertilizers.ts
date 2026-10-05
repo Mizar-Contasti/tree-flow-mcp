@@ -2,9 +2,7 @@ import { TreeflowClient, maskSecrets } from '../client/treeflowClient.js';
 import { fertilizersSummary, scriptLine, toolLine, toolLogsSummary } from './resumen.js';
 import { ok, variableSchema } from './util.js';
 
-const TOOL_NOTE =
-  'Las variables se escriben { $nombre } en la URL y el cuerpo (la sintaxis {{ }} ya no existe). ' +
-  'Los nombres de herramientas son únicos por bot: si se repite, el servidor añade _2, _3…';
+const STATUS = { type: 'string', enum: ['unconfigured', 'validated', 'deployed', 'error'], description: 'Sólo al modificar' };
 
 export function registerFertilizerTools(client: TreeflowClient) {
   return [
@@ -22,77 +20,39 @@ export function registerFertilizerTools(client: TreeflowClient) {
       handler: async (args: { tree_id: string }) => ok(fertilizersSummary(await client.listFertilizers(args.tree_id))),
     },
     {
-      name: 'treeflow_create_tool',
+      name: 'treeflow_save_tool',
       description:
-        'Crea una herramienta de tipo API (llamada HTTP) y la guarda. ' + TOOL_NOTE +
-        ' Después conviene probarla con treeflow_test_tool; el estado queda "unconfigured" hasta entonces.',
+        'Crea (sin tool_id) o modifica (con tool_id: ID o nombre) una herramienta API, una llamada HTTP que el bot ' +
+        'hace durante la conversación. Al modificar sólo hace falta mandar lo que cambia; las listas de variables, si ' +
+        'las mandas, sustituyen a las anteriores, y la API vuelve a "unconfigured" salvo que indiques status. ' +
+        'Pruébala después con treeflow_test_tool. Variables, autenticación y jsonPath: treeflow_guide("apis").',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
-          name: { type: 'string', description: 'Nombre único de la herramienta' },
-          url: { type: 'string', description: 'URL a llamar. Admite variables { $nombre }' },
-          method: { type: 'string', enum: ['POST', 'GET', 'PATCH', 'PUT', 'DELETE', 'QUERY'], description: 'Default: POST' },
+          tool_id: { type: 'string', description: 'Para modificar: ID o nombre. Sin él se crea una nueva' },
+          name: { type: 'string', description: 'Obligatorio al crear; único por bot' },
+          url: { type: 'string', description: 'Obligatoria al crear. Admite { $variable }' },
+          method: { type: 'string', enum: ['POST', 'GET', 'PATCH', 'PUT', 'DELETE', 'QUERY'], description: 'Default POST' },
           description: { type: 'string' },
-          body: { type: 'string', description: 'Cuerpo JSON como texto (default "{}"). Admite { $nombre }' },
+          body: { type: 'string', description: 'Cuerpo JSON como texto. Admite { $variable }' },
           timeout: { type: 'integer', description: 'Milisegundos (default 30000)' },
-          authType: { type: 'string', enum: ['none', 'basic', 'bearer', 'apiKey'] },
-          authConfig: {
-            type: 'object',
-            description: 'basic: {username,password}. bearer: {token}. apiKey: {key,value,in:"header"|"query"}',
-          },
-          inputVariables: { ...variableSchema, description: 'Datos que el bot le pasa a la API' },
-          outputVariables: { ...variableSchema, description: 'Datos que el bot extrae de la respuesta' },
-          errorMessage: { type: 'object', description: 'Mensaje al usuario si falla sin valores de respaldo, por idioma: {"es":"..."}' },
-        },
-        required: ['tree_id', 'name', 'url'],
-      },
-      handler: async (a: any) => {
-        const { tree_id, ...input } = a;
-        return ok(`API creada: ${toolLine(await client.createTool(tree_id, input))}`);
-      },
-    },
-    {
-      name: 'treeflow_update_tool',
-      description:
-        'Modifica una herramienta API existente (por id o nombre). Sólo hace falta mandar lo que cambia. ' +
-        'Si mandas inputVariables u outputVariables, sustituyen a la lista completa. ' +
-        'Al cambiarla vuelve a "unconfigured" salvo que indiques status. ' + TOOL_NOTE,
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tree_id: { type: 'string' },
-          tool_id: { type: 'string', description: 'ID o nombre de la herramienta' },
-          name: { type: 'string' },
-          url: { type: 'string' },
-          method: { type: 'string', enum: ['POST', 'GET', 'PATCH', 'PUT', 'DELETE', 'QUERY'] },
-          description: { type: 'string' },
-          body: { type: 'string' },
-          timeout: { type: 'integer' },
           enabled: { type: 'boolean' },
           authType: { type: 'string', enum: ['none', 'basic', 'bearer', 'apiKey'] },
-          authConfig: { type: 'object', description: 'Se fusiona con la existente' },
-          inputVariables: variableSchema,
-          outputVariables: variableSchema,
-          errorMessage: { type: 'object' },
-          status: { type: 'string', enum: ['unconfigured', 'validated', 'deployed', 'error'] },
+          authConfig: { type: 'object', description: 'Se combina con la guardada' },
+          inputVariables: { ...variableSchema, description: 'Datos que el bot le pasa a la API' },
+          outputVariables: { ...variableSchema, description: 'Datos que el bot extrae de la respuesta' },
+          errorMessage: { type: 'object', description: 'Mensaje si falla, por idioma: {"es":"…"}' },
+          status: STATUS,
         },
-        required: ['tree_id', 'tool_id'],
+        required: ['tree_id'],
       },
       handler: async (a: any) => {
-        const { tree_id, tool_id, ...patch } = a;
-        return ok(`API actualizada: ${toolLine(await client.updateTool(tree_id, tool_id, patch))}`);
+        const { tree_id, tool_id, ...fields } = a;
+        if (tool_id) return ok(`API actualizada: ${toolLine(await client.updateTool(tree_id, tool_id, fields))}`);
+        if (!fields.name || !fields.url) throw new Error('Para crear una API hacen falta name y url (para modificar una, manda tool_id).');
+        return ok(`API creada: ${toolLine(await client.createTool(tree_id, fields))}`);
       },
-    },
-    {
-      name: 'treeflow_delete_tool',
-      description: 'Elimina una herramienta API del bot (por id o nombre). Los nodos que la usen dejan de ejecutarla.',
-      inputSchema: {
-        type: 'object',
-        properties: { tree_id: { type: 'string' }, tool_id: { type: 'string', description: 'ID o nombre' } },
-        required: ['tree_id', 'tool_id'],
-      },
-      handler: async (a: { tree_id: string; tool_id: string }) => ok(await client.deleteTool(a.tree_id, a.tool_id)),
     },
     {
       name: 'treeflow_test_tool',
@@ -136,66 +96,35 @@ export function registerFertilizerTools(client: TreeflowClient) {
       },
     },
     {
-      name: 'treeflow_create_script',
+      name: 'treeflow_save_script',
       description:
-        'Crea un script personalizado (Python o Node.js) y lo guarda. El código lee las entradas con inputs.get("nombre") ' +
-        'y debe dejar el resultado en un dict `outputs`, ej. outputs = {"resultado": valor}. Los nombres son únicos por bot ' +
-        '(un duplicado da error 400). Pruébalo con treeflow_test_script.',
+        'Crea (sin script_id) o modifica (con script_id: ID o nombre) un script Python o Node.js del bot. El código ' +
+        'lee las entradas con inputs.get("nombre") y deja el resultado en outputs = {…}. Al modificar sólo hace falta ' +
+        'mandar lo que cambia. Pruébalo con treeflow_test_script.',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string' },
-          name: { type: 'string' },
-          code: { type: 'string', description: 'Código fuente' },
-          language: { type: 'string', enum: ['python', 'node', 'javascript'], description: 'Default: python' },
+          script_id: { type: 'string', description: 'Para modificar: ID o nombre. Sin él se crea uno nuevo' },
+          name: { type: 'string', description: 'Obligatorio al crear; único por bot' },
+          code: { type: 'string', description: 'Obligatorio al crear' },
+          language: { type: 'string', enum: ['python', 'node', 'javascript'], description: 'Default python' },
           description: { type: 'string' },
           timeout: { type: 'integer', description: 'Milisegundos (default 5000)' },
-          inputVariables: variableSchema,
-          outputVariables: variableSchema,
-          errorMessage: { type: 'object' },
-        },
-        required: ['tree_id', 'name', 'code'],
-      },
-      handler: async (a: any) => {
-        const { tree_id, ...input } = a;
-        return ok(`Script creado: ${scriptLine(await client.createScript(tree_id, input))}`);
-      },
-    },
-    {
-      name: 'treeflow_update_script',
-      description: 'Modifica un script (por id o nombre). Sólo hace falta mandar lo que cambia; las listas de variables, si se mandan, sustituyen a las anteriores.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tree_id: { type: 'string' },
-          script_id: { type: 'string', description: 'ID o nombre' },
-          name: { type: 'string' },
-          code: { type: 'string' },
-          language: { type: 'string', enum: ['python', 'node', 'javascript'] },
-          description: { type: 'string' },
-          timeout: { type: 'integer' },
           enabled: { type: 'boolean' },
           inputVariables: variableSchema,
           outputVariables: variableSchema,
           errorMessage: { type: 'object' },
-          status: { type: 'string', enum: ['unconfigured', 'validated', 'deployed', 'error'] },
+          status: STATUS,
         },
-        required: ['tree_id', 'script_id'],
+        required: ['tree_id'],
       },
       handler: async (a: any) => {
-        const { tree_id, script_id, ...patch } = a;
-        return ok(`Script actualizado: ${scriptLine(await client.updateScript(tree_id, script_id, patch))}`);
+        const { tree_id, script_id, ...fields } = a;
+        if (script_id) return ok(`Script actualizado: ${scriptLine(await client.updateScript(tree_id, script_id, fields))}`);
+        if (!fields.name || !fields.code) throw new Error('Para crear un script hacen falta name y code (para modificar uno, manda script_id).');
+        return ok(`Script creado: ${scriptLine(await client.createScript(tree_id, fields))}`);
       },
-    },
-    {
-      name: 'treeflow_delete_script',
-      description: 'Elimina un script del bot (por id o nombre).',
-      inputSchema: {
-        type: 'object',
-        properties: { tree_id: { type: 'string' }, script_id: { type: 'string', description: 'ID o nombre' } },
-        required: ['tree_id', 'script_id'],
-      },
-      handler: async (a: { tree_id: string; script_id: string }) => ok(await client.deleteScript(a.tree_id, a.script_id)),
     },
     {
       name: 'treeflow_test_script',

@@ -203,37 +203,4 @@ export declare function registerEntityTools(client: TreeflowClient): ({
             text: string;
         }[];
     }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
-            entity_id: {
-                type: string;
-                description: string;
-            };
-            entities?: undefined;
-            name?: undefined;
-            type?: undefined;
-            add_values?: undefined;
-            remove_values?: undefined;
-            values?: undefined;
-            pattern?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        tree_id: string;
-        entity_id: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
 })[];

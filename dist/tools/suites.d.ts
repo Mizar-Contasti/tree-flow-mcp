@@ -7,6 +7,7 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
         properties: {
             tree_id: {
                 type: string;
+                description?: undefined;
             };
             suite_id?: undefined;
             name?: undefined;
@@ -36,6 +37,7 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
         properties: {
             suite_id: {
                 type: string;
+                description?: undefined;
             };
             tree_id?: undefined;
             name?: undefined;
@@ -65,9 +67,15 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
         properties: {
             tree_id: {
                 type: string;
+                description: string;
+            };
+            suite_id: {
+                type: string;
+                description: string;
             };
             name: {
                 type: string;
+                description: string;
             };
             description: {
                 type: string;
@@ -99,78 +107,9 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
                                                     type: string;
                                                     enum: string[];
                                                 };
-                                                nombre: {
+                                                valor: {
                                                     type: string;
                                                     description: string;
-                                                };
-                                            };
-                                            required: string[];
-                                        };
-                                    };
-                                };
-                                required: string[];
-                            };
-                        };
-                    };
-                    required: string[];
-                };
-            };
-            suite_id?: undefined;
-            csv?: undefined;
-            modo?: undefined;
-            limit?: undefined;
-            run_id?: undefined;
-            other_run_id?: undefined;
-        };
-        required: string[];
-    };
-    handler: (a: any) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            suite_id: {
-                type: string;
-            };
-            name: {
-                type: string;
-            };
-            description: {
-                type: string;
-            };
-            cases: {
-                type: string;
-                description: string;
-                items: {
-                    type: string;
-                    properties: {
-                        nombre: {
-                            type: string;
-                        };
-                        turnos: {
-                            type: string;
-                            items: {
-                                type: string;
-                                properties: {
-                                    mensaje: {
-                                        type: string;
-                                        description: string;
-                                    };
-                                    asserts: {
-                                        type: string;
-                                        items: {
-                                            type: string;
-                                            properties: {
-                                                tipo: {
-                                                    type: string;
-                                                    enum: string[];
                                                 };
                                                 nombre: {
                                                     type: string;
@@ -188,14 +127,13 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
                     required: string[];
                 };
             };
-            tree_id?: undefined;
             csv?: undefined;
             modo?: undefined;
             limit?: undefined;
             run_id?: undefined;
             other_run_id?: undefined;
         };
-        required: string[];
+        required?: undefined;
     };
     handler: (a: any) => Promise<{
         content: {
@@ -211,6 +149,7 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
         properties: {
             suite_id: {
                 type: string;
+                description?: undefined;
             };
             csv: {
                 type: string;
@@ -244,6 +183,7 @@ export declare function registerSuiteTools(client: TreeflowClient): ({
         properties: {
             suite_id: {
                 type: string;
+                description?: undefined;
             };
             limit: {
                 type: string;

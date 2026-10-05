@@ -193,36 +193,4 @@ export declare function registerIntentTools(client: TreeflowClient): ({
             text: string;
         }[];
     }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
-            intent_id: {
-                type: string;
-                description: string;
-            };
-            intents?: undefined;
-            name?: undefined;
-            add_patterns?: undefined;
-            remove_patterns?: undefined;
-            patterns?: undefined;
-            entities?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        tree_id: string;
-        intent_id: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
 })[];

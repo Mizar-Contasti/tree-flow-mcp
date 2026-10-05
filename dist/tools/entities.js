@@ -103,22 +103,6 @@ export function registerEntityTools(client) {
                 return ok(`Entidad actualizada: ${entityLine(result)}`);
             },
         },
-        {
-            name: 'treeflow_delete_entity',
-            description: 'Elimina una entidad NLU.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    entity_id: { type: 'string', description: 'ID de la entidad a eliminar' },
-                },
-                required: ['tree_id', 'entity_id'],
-            },
-            handler: async (args) => {
-                const result = await client.deleteEntity(args.tree_id, args.entity_id);
-                return ok(result);
-            },
-        },
     ];
 }
 //# sourceMappingURL=entities.js.map

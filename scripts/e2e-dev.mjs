@@ -131,11 +131,11 @@ assert.ok(branchId && startId, 'create_branch debe devolver el ID de la rama y e
 const hoja = await measured('create_leaf', { branch_id: branchId, leaves: [{ leaf_type: 'message', name: 'Hoja e2e', config: { messageText: 'hola' } }] });
 const leafId = hoja.match(/\[([^\]]+)\]/)?.[1];
 assert.ok((await measured('update_leaf', { leaf_id: leafId, branch_id: branchId, config: { nextLeafId: startId } })).endsWith(`→ ${startId}`));
-await call('delete_leaf', { leaf_id: leafId });
-await call('delete_branch', { branch_id: branchId });
+await call('delete', { tree_id: T, tipo: 'leaf', ref: leafId });
+await call('delete', { tree_id: T, tipo: 'branch', ref: branchId });
 step('create_branch, create_leaf y update_leaf devuelven una línea con lo necesario (y se limpiaron)');
 
-const suite = await measured('create_test_suite', {
+const suite = await measured('save_test_suite', {
   tree_id: T, name: `Suite e2e ${Date.now()}`,
   cases: [
     { nombre: 'Saludo', turnos: [{ mensaje: 'hola', asserts: [{ tipo: 'intencion', valor: 'saludo' }] }] },
@@ -147,7 +147,7 @@ const run = await measured('run_test_suite', { suite_id: suiteId });
 assert.match(run, /1\/2 casos bien/);
 assert.match(run, /Falla a propósito/);
 assert.ok(!run.includes('- Saludo'), 'lo que pasó no se repite');
-await call('delete_test_suite', { suite_id: suiteId });
+await call('delete', { tree_id: T, tipo: 'test_suite', ref: suiteId });
 step('run_test_suite devuelve los totales y sólo el caso que falló (la suite se borró)');
 
 // ── Fase 4: menos vueltas ──

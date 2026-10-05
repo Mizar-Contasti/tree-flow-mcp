@@ -9,11 +9,11 @@ export declare function registerTemplateTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            template_id?: undefined;
             name?: undefined;
             text?: undefined;
             description?: undefined;
             responses?: undefined;
-            template_id?: undefined;
         };
         required: string[];
     };
@@ -35,6 +35,10 @@ export declare function registerTemplateTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            template_id: {
+                type: string;
+                description: string;
+            };
             name: {
                 type: string;
                 description: string;
@@ -45,96 +49,24 @@ export declare function registerTemplateTools(client: TreeflowClient): ({
             };
             description: {
                 type: string;
-                description: string;
             };
             responses: {
                 type: string;
-                description: string;
                 items: {
                     type: string;
                 };
+                description: string;
             };
-            template_id?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         tree_id: string;
-        name: string;
-        text?: string;
-        description?: string;
-        responses?: any[];
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            template_id: {
-                type: string;
-                description: string;
-            };
-            name: {
-                type: string;
-                description: string;
-            };
-            text: {
-                type: string;
-                description: string;
-            };
-            description: {
-                type: string;
-                description: string;
-            };
-            responses: {
-                type: string;
-                items: {
-                    type: string;
-                };
-                description: string;
-            };
-            tree_id?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        template_id: string;
+        template_id?: string;
         name?: string;
         text?: string;
         description?: string;
         responses?: any[];
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            template_id: {
-                type: string;
-                description: string;
-            };
-            tree_id?: undefined;
-            name?: undefined;
-            text?: undefined;
-            description?: undefined;
-            responses?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        template_id: string;
     }) => Promise<{
         content: {
             type: string;

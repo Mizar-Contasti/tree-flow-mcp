@@ -16,12 +16,10 @@ export declare const variableSchema: {
         properties: {
             name: {
                 type: string;
-                description: string;
             };
             type: {
                 type: string;
                 enum: string[];
-                description: string;
             };
             description: {
                 type: string;

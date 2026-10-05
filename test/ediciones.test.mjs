@@ -112,7 +112,7 @@ test('update_tool con la URL o el token enmascarados no pisa los secretos guarda
   const config = structuredClone(fx.fertilizers);
   config.additionalFertilizers[0].url = 'https://api.ejemplo.com/precios?key=REAL';
   const { tools, sent } = conHttp({ [`/api/fertilizers/${fx.TREE_ID}`]: config });
-  await tools.update_tool.handler({
+  await tools.save_tool.handler({
     tree_id: fx.TREE_ID, tool_id: 'precios',
     url: 'https://api.ejemplo.com/v2/precios?key=***', authConfig: { token: '***' }, timeout: 5000,
   });
@@ -125,7 +125,7 @@ test('update_tool con la URL o el token enmascarados no pisa los secretos guarda
 test('update_transfer con el token enmascarado conserva el real', async () => {
   const current = { name: 'Asesor', endpoint_url: 'https://help.com/in?token=REAL', auth_token: 'REAL2', is_active: true };
   const { tools, sent } = conHttp({ [`/api/integrations/transfers/${fx.TREE_ID}/cfg-1`]: current });
-  await tools.update_transfer.handler({ tree_id: fx.TREE_ID, config_id: 'cfg-1', auth_token: '***', endpoint_url: 'https://help.com/in?token=***', transfer_message: 'Te paso' });
+  await tools.save_transfer.handler({ tree_id: fx.TREE_ID, config_id: 'cfg-1', auth_token: '***', endpoint_url: 'https://help.com/in?token=***', transfer_message: 'Te paso' });
   const { body } = sent.at(-1);
   assert.equal(body.auth_token, 'REAL2');
   assert.equal(body.endpoint_url, 'https://help.com/in?token=REAL');

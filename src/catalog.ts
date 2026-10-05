@@ -18,6 +18,8 @@ import { registerSuiteTools } from './tools/suites.js';
 import { registerLiveChatTools } from './tools/livechat.js';
 import { registerBackupTools } from './tools/backups.js';
 import { registerDetailTools } from './tools/detail.js';
+import { registerDeleteTools } from './tools/delete.js';
+import { registerGuideTools } from './tools/guide.js';
 
 export interface ToolDef {
   name: string;
@@ -29,77 +31,37 @@ export interface ToolDef {
 // Reglas que ninguna descripción de herramienta puede transmitir por sí sola:
 // aplican al servicio completo y evitan los errores más caros (sobre todo
 // olvidar el reentrenamiento, que deja los cambios sin efecto en silencio).
-export const INSTRUCTIONS = `Treeflow es una plataforma de chatbots NLU. Un "árbol" (tree) es un bot.
+export const INSTRUCTIONS = `Treeflow es una plataforma de chatbots NLU. Un árbol (tree) es un bot.
+Dos subsistemas que NO son lo mismo: el canvas (ramas = flujos, hojas = sus nodos; una rama
+nueva trae su hoja Start) y el NLU (intenciones con frases de entrenamiento, entidades con
+valores y sinónimos; en las frases, una entidad se escribe @nombre).
 
-DOS SUBSISTEMAS DISTINTOS, no los confundas:
-1. Canvas visual: Ramas (branches) son contenedores de flujo; Hojas (leafs) son
-   los nodos dentro de una rama (message, intent, trigger_context, condition...).
-   Al crear una rama se genera sola una hoja "Start".
-2. NLU: Intenciones (intents) tienen frases de entrenamiento; Entidades (entities)
-   tienen valores y sinónimos. Son los datos con los que se entrena el modelo.
-Ramas/Hojas NO son sinónimo de Intenciones/Entidades: conviven pero sirven a cosas
-distintas.
+AHORRA LLAMADAS: cada una reenvía toda la conversación.
+- Explora con treeflow_get_tree_data (una línea por pieza, con su ID) y pide el detalle con
+  treeflow_get_detail sólo de lo que vayas a tocar.
+- Crea en lote: treeflow_create_intent, _create_entity y _create_leaf reciben listas (las hojas
+  nuevas se enlazan con "ref:<ref>").
+- Al editar manda sólo lo que cambia: el resto se conserva. Una lista que mandes se sustituye
+  entera; para añadir o quitar frases o valores usa add_/remove_.
 
-REENTRENAMIENTO OBLIGATORIO: después de crear, modificar o borrar intenciones o
-entidades, llama a treeflow_trigger_training. Si no lo haces, el motor NLU sigue
-usando el modelo viejo y tus cambios no surten efecto, sin aviso ni error. Espera a
-que termine y te dice si quedó listo (can_use): no hace falta consultar el estado.
+REENTRENA después de tocar intenciones o entidades, una vez al final: treeflow_trigger_training
+espera y dice si quedó listo. Sin reentrenar, los cambios no surten efecto y nada avisa.
 
-EN LOTE: treeflow_create_intent, treeflow_create_entity y treeflow_create_leaf reciben
-listas. Crea todo lo de un paso en una llamada, no una por pieza; y entrena una vez al
-final, no después de cada cambio. Las hojas nuevas se enlazan entre sí con "ref:<ref>".
+TEXTOS CON HUECOS: {$variable}. La sintaxis {{ }} ya no existe e imprime otra cosa.
+Guía de referencia (plantillas, APIs, scripts, hojas, capturas, suites): treeflow_guide.
 
-EXPLORAR: treeflow_get_tree_data da el esquema de todo el bot en una llamada (cada
-hoja en una línea, con su ID). Las lecturas resumen; el detalle completo de una pieza
-se pide con treeflow_get_detail, y sólo de lo que vayas a tocar: todo lo que leas se
-queda en la conversación y cuesta en cada llamada siguiente.
-
-PATRONES: dentro de las frases de una intención, las entidades se referencian con
-arroba, por ejemplo "quiero una @tipo_habitacion".
-
-ACTUALIZACIONES: en update sólo hace falta mandar lo que cambia; el resto se conserva.
-Una lista que mandes (frases, valores, parámetros, variables, casos) se sustituye
-entera; para añadir o quitar frases o valores usa add_patterns / remove_patterns y
-add_values / remove_values, que no obligan a leerlos antes. En treeflow_update_leaf el
-config se combina por claves (una en null se borra) y hace falta branch_id o tree_id.
-
-WORKSPACE: sale del API Key. No le pidas al usuario un workspace ni un ID de
-workspace.
-
-ANTES DE CAMBIOS GRANDES: treeflow_create_backup deja un snapshot restaurable.
-
-HERRAMIENTAS Y PLANTILLAS: el bot puede decir cosas con huecos. Hay UNA sola sintaxis:
-{ ... }, y dentro el $ distingue una variable de un texto. {$nombre} es la variable
-nombre; {nombre} es la palabra "nombre". Condiciones: {$edad > 18 ? "adulto" : "menor"}.
-La sintaxis {{ }} ya NO existe: un texto con ella no falla, imprime otra cosa
-({{$x}} sale como "{Ana}"). Vale para mensajes, preguntas de captura, y la URL y el
-cuerpo de las herramientas.
- - Una herramienta API (treeflow_create_tool) se guarda con campos planos (url,
-   method, body, authType, inputVariables, outputVariables…). Tras crearla o
-   cambiarla, pruébala con treeflow_test_tool: llama de verdad a la URL y devuelve
-   estado ok / sin_datos / error. Los scripts igual (treeflow_test_script).
- - Los nombres de herramientas y scripts son únicos por bot.
- - Contraseñas, tokens y claves en la URL salen enmascarados (***): es normal. Los
-   valores reales siguen guardados, y un *** que devuelvas al actualizar no los pisa.
- - Las capturas son preguntas reutilizables del slot filling: cambiar una afecta a
-   todos los parámetros que la usan, y surte efecto sin reentrenar.
- - Tras cambios de lógica, treeflow_run_test_suite detecta regresiones, y
-   treeflow_compare_test_runs dice qué cambió entre dos ejecuciones.
-
-RESTAURAR: treeflow_restore_snapshot sobrescribe el bot. Exige confirmación explícita
-del usuario y crea antes un snapshot de seguridad.
-
-MESA DE AYUDA: las herramientas de chat en vivo son sólo de lectura. Tomar, responder
-o cerrar una atención se hace desde la mesa de ayuda de Treeflow.
-
-BORRADOS: eliminar bots o usuarios no está disponible a propósito, por ser
-irreversible. Si el usuario lo pide, dile que lo haga desde el panel de Treeflow.`;
+El workspace sale de la API key: no lo pidas. Los secretos salen como ***; devolverlos así no
+los pisa. Antes de cambios grandes, treeflow_create_backup. treeflow_delete y
+treeflow_restore_snapshot son irreversibles: confírmalos con el usuario. Los bots y los usuarios
+no se borran desde aquí, y la mesa de ayuda es de sólo lectura: eso se hace en el panel.`;
 
 // Catálogo completo, agrupado por módulo para poder medirlo por partes.
 export function buildToolGroups(client: TreeflowClient): Record<string, ToolDef[]> {
   return {
     trees: registerTreeTools(client),
     detail: registerDetailTools(client),
+    delete: registerDeleteTools(client),
+    guide: registerGuideTools(),
     branches: registerBranchTools(client),
     leafs: registerLeafTools(client),
     intents: registerIntentTools(client),

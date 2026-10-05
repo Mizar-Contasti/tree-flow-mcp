@@ -33,12 +33,12 @@ export const variableSchema = {
     items: {
         type: 'object',
         properties: {
-            name: { type: 'string', description: 'Nombre de la variable. Se usa como { $nombre } en la URL y el cuerpo' },
-            type: { type: 'string', enum: ['string', 'number', 'boolean', 'object', 'array'], description: 'Tipo (default: string)' },
+            name: { type: 'string' },
+            type: { type: 'string', enum: ['string', 'number', 'boolean', 'object', 'array'] },
             description: { type: 'string' },
-            jsonPath: { type: 'string', description: 'Sólo en salidas: ruta dentro del JSON de respuesta, ej. "data.items[0].precio"' },
-            testValue: { type: 'string', description: 'Sólo en entradas: valor que se usa al probar' },
-            fallbackValue: { type: 'string', description: 'Sólo en salidas: valor si la herramienta falla o no devuelve ese dato' },
+            jsonPath: { type: 'string', description: 'Salidas: ruta en la respuesta' },
+            testValue: { type: 'string', description: 'Entradas: valor de prueba' },
+            fallbackValue: { type: 'string', description: 'Salidas: valor si falla' },
         },
         required: ['name'],
     },

@@ -16,71 +16,36 @@ export function registerTemplateTools(client) {
             handler: async (args) => ok(`${templatesSummary(await client.listMessageTemplates(args.tree_id))}\n${DETAIL_HINT}`),
         },
         {
-            name: 'treeflow_create_message_template',
-            description: 'Crea una nueva plantilla de mensaje (MessageTemplate) para respuestas estructuradas o enriquecidas (texto plano, botones, tarjetas, carruseles, audios).',
+            name: 'treeflow_save_message_template',
+            description: 'Crea (sin template_id) o modifica (con template_id) una plantilla de mensaje: un texto de respaldo y, si ' +
+                'hace falta, bloques enriquecidos. Al modificar sólo hace falta mandar lo que cambia; responses, si lo mandas, ' +
+                'sustituye todos los bloques. Para el formato de los bloques, copia el de una plantilla existente ' +
+                '(treeflow_get_detail con tipo template).',
             inputSchema: {
                 type: 'object',
                 properties: {
                     tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    name: { type: 'string', description: 'Nombre representativo de la plantilla (ej. respuesta_bienvenida, menu_principal)' },
-                    text: { type: 'string', description: 'Texto plano de respaldo (fallback text)' },
-                    description: { type: 'string', description: 'Descripción corta opcional' },
-                    responses: {
-                        type: 'array',
-                        description: 'Arreglo de bloques enriquecidos (RichBlocks) compatibles con WhatsApp, Webchat y Telegram. Tipos soportados: text ({type: "text", text: "..."}), card ({type: "card", title, subtitle, imageUrl, buttons: [{label, url, payload}]}), quick_replies ({type: "quick_replies", options: ["Opción 1", "Opción 2"]}), carousel ({type: "carousel", cards: [...]}), image ({type: "image", url}), audio ({type: "audio", url}), file ({type: "file", url, filename}), location ({type: "location", latitude, longitude, address}).',
-                        items: { type: 'object' },
-                    },
+                    template_id: { type: 'string', description: 'Para modificar. Sin él se crea una nueva' },
+                    name: { type: 'string', description: 'Obligatorio al crear (ej. menu_principal)' },
+                    text: { type: 'string', description: 'Texto de respaldo. Admite { $variable }' },
+                    description: { type: 'string' },
+                    responses: { type: 'array', items: { type: 'object' }, description: 'Bloques enriquecidos' },
                 },
-                required: ['tree_id', 'name'],
+                required: ['tree_id'],
             },
             handler: async (args) => {
-                const result = await client.createMessageTemplate(args.tree_id, {
-                    name: args.name,
-                    text: args.text || args.name,
-                    description: args.description,
-                    responses: args.responses || [{ type: 'text', text: args.text || args.name }],
+                const { tree_id, template_id, ...fields } = args;
+                if (template_id)
+                    return ok(`Plantilla actualizada: ${templateLine(await client.updateMessageTemplate(template_id, fields))}`);
+                if (!fields.name)
+                    throw new Error('Para crear una plantilla hace falta name (para modificar una, manda template_id).');
+                const result = await client.createMessageTemplate(tree_id, {
+                    name: fields.name,
+                    text: fields.text || fields.name,
+                    description: fields.description,
+                    responses: fields.responses || [{ type: 'text', text: fields.text || fields.name }],
                 });
                 return ok(`Plantilla creada: ${templateLine(result)}`);
-            },
-        },
-        {
-            name: 'treeflow_update_message_template',
-            description: 'Actualiza una plantilla de mensaje. Lo que no mandes se conserva; responses, si lo mandas, sustituye todos ' +
-                'los bloques.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    template_id: { type: 'string', description: 'ID de la plantilla a actualizar' },
-                    name: { type: 'string', description: 'Nuevo nombre' },
-                    text: { type: 'string', description: 'Nuevo texto plano fallback' },
-                    description: { type: 'string', description: 'Nueva descripción' },
-                    responses: { type: 'array', items: { type: 'object' }, description: 'Nuevo arreglo de bloques enriquecidos' },
-                },
-                required: ['template_id'],
-            },
-            handler: async (args) => {
-                const result = await client.updateMessageTemplate(args.template_id, {
-                    name: args.name,
-                    text: args.text,
-                    description: args.description,
-                    responses: args.responses,
-                });
-                return ok(`Plantilla actualizada: ${templateLine(result)}`);
-            },
-        },
-        {
-            name: 'treeflow_delete_message_template',
-            description: 'Elimina una plantilla de mensaje.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    template_id: { type: 'string', description: 'ID de la plantilla a eliminar' },
-                },
-                required: ['template_id'],
-            },
-            handler: async (args) => {
-                const result = await client.deleteMessageTemplate(args.template_id);
-                return ok(result);
             },
         },
     ];

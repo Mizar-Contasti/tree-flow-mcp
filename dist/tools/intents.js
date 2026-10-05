@@ -84,22 +84,6 @@ export function registerIntentTools(client) {
                 return ok(`Intención actualizada: ${intentLine(result)}`);
             },
         },
-        {
-            name: 'treeflow_delete_intent',
-            description: 'Elimina una intención NLU de un bot.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    intent_id: { type: 'string', description: 'ID de la intención a eliminar' },
-                },
-                required: ['tree_id', 'intent_id'],
-            },
-            handler: async (args) => {
-                const result = await client.deleteIntent(args.tree_id, args.intent_id);
-                return ok(result);
-            },
-        },
     ];
 }
 //# sourceMappingURL=intents.js.map

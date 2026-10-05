@@ -75,11 +75,9 @@ export function registerLeafTools(client) {
         },
         {
             name: 'treeflow_create_leaf',
-            description: 'Crea una o varias hojas en una rama, en una sola llamada. Las hojas nuevas se pueden enlazar entre sí: en ' +
-                'cualquier valor del config (nextLeafId, targetLeafId de intents/events…) escribe "ref:<ref>" con el ref de ' +
-                'otra hoja de la misma lista, y se sustituye por su ID. Tipos habituales: intent (responde a una intención: ' +
-                'intentName, messageText, nextLeafId), trigger_context (escucha intents/events y salta a su targetLeafId), ' +
-                'event (responde a un evento como sys.no-match). Sin posición, se colocan en fila.',
+            description: 'Crea una o varias hojas en una rama, en una sola llamada. Enlázalas entre sí escribiendo "ref:<ref>" en ' +
+                'cualquier valor del config (nextLeafId, targetLeafId…): se sustituye por el ID. Tipos y claves del config: ' +
+                'treeflow_guide("hojas"). Sin posición, se colocan en fila.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -108,9 +106,8 @@ export function registerLeafTools(client) {
         },
         {
             name: 'treeflow_update_leaf',
-            description: 'Actualiza un nodo (leaf): nombre, tipo, posición o config. config se combina con el guardado: manda sólo ' +
-                'las claves que cambian (ej. {"messageText": "…"}), una clave en null se borra, y lo demás se conserva. ' +
-                'Una clave que es lista (intents, events) se sustituye completa. Para combinar hace falta branch_id o tree_id.',
+            description: 'Actualiza una hoja. config se combina con el guardado: manda sólo las claves que cambian (null borra una); ' +
+                'las listas (intents, events) se sustituyen completas. Hace falta branch_id o tree_id para leer el guardado.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -137,21 +134,6 @@ export function registerLeafTools(client) {
                     is_start: args.is_start,
                 }, { branchId: args.branch_id, treeId: args.tree_id, replaceConfig: args.replace_config });
                 return ok(`Hoja actualizada: ${leafLine(result, canvasNames([]))}`);
-            },
-        },
-        {
-            name: 'treeflow_delete_leaf',
-            description: 'Elimina un nodo (leaf) del canvas.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    leaf_id: { type: 'string', description: 'ID del nodo a eliminar' },
-                },
-                required: ['leaf_id'],
-            },
-            handler: async (args) => {
-                const result = await client.deleteLeaf(args.leaf_id);
-                return ok(result);
             },
         },
     ];

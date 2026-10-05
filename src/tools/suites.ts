@@ -5,8 +5,7 @@ import { ok } from './util.js';
 const casesSchema = {
   type: 'array',
   description:
-    'Casos de prueba. Cada caso: { nombre, turnos:[{ mensaje, asserts:[…] }] }. Un caso sin turnos se rechaza. ' +
-    'Cada assert lleva "tipo": intencion | respuesta_contiene | parametro (con "nombre") | slot | evento, más el valor esperado.',
+    'Casos de prueba: { nombre, turnos:[{ mensaje, asserts:[{ tipo, valor, nombre? }] }] }. Un caso sin turnos se rechaza.',
   items: {
     type: 'object',
     properties: {
@@ -23,7 +22,8 @@ const casesSchema = {
                 type: 'object',
                 properties: {
                   tipo: { type: 'string', enum: ['intencion', 'respuesta_contiene', 'parametro', 'slot', 'evento'] },
-                  nombre: { type: 'string', description: 'Obligatorio si tipo es "parametro"' },
+                  valor: { type: 'string', description: 'Lo esperado' },
+                  nombre: { type: 'string', description: 'El parámetro, si tipo es "parametro"' },
                 },
                 required: ['tipo'],
               },
@@ -52,36 +52,26 @@ export function registerSuiteTools(client: TreeflowClient) {
       handler: async (a: { suite_id: string }) => ok(await client.getTestSuite(a.suite_id)),
     },
     {
-      name: 'treeflow_create_test_suite',
-      description: 'Crea una suite de prueba, opcionalmente con sus casos.',
+      name: 'treeflow_save_test_suite',
+      description:
+        'Crea (sin suite_id) o modifica (con suite_id) una suite de prueba. Al modificar, cases, si lo mandas, ' +
+        'sustituye a TODOS los casos anteriores.',
       inputSchema: {
         type: 'object',
-        properties: { tree_id: { type: 'string' }, name: { type: 'string' }, description: { type: 'string' }, cases: casesSchema },
-        required: ['tree_id', 'name'],
+        properties: {
+          tree_id: { type: 'string', description: 'Obligatorio al crear' },
+          suite_id: { type: 'string', description: 'Para modificar. Sin él se crea una nueva' },
+          name: { type: 'string', description: 'Obligatorio al crear' },
+          description: { type: 'string' },
+          cases: casesSchema,
+        },
       },
       handler: async (a: any) => {
-        const { tree_id, ...data } = a;
+        const { tree_id, suite_id, ...data } = a;
+        if (suite_id) return ok(`${suiteLine(await client.updateTestSuite(suite_id, data))} actualizada`);
+        if (!tree_id || !data.name) throw new Error('Para crear una suite hacen falta tree_id y name (para modificar una, manda suite_id).');
         return ok(`${suiteLine(await client.createTestSuite(tree_id, data))} creada`);
       },
-    },
-    {
-      name: 'treeflow_update_test_suite',
-      description: 'Modifica una suite. Si mandas "cases", sustituye a TODOS los casos anteriores.',
-      inputSchema: {
-        type: 'object',
-        properties: { suite_id: { type: 'string' }, name: { type: 'string' }, description: { type: 'string' }, cases: casesSchema },
-        required: ['suite_id'],
-      },
-      handler: async (a: any) => {
-        const { suite_id, ...data } = a;
-        return ok(`${suiteLine(await client.updateTestSuite(suite_id, data))} actualizada`);
-      },
-    },
-    {
-      name: 'treeflow_delete_test_suite',
-      description: 'Elimina una suite de prueba y su historial de ejecuciones.',
-      inputSchema: { type: 'object', properties: { suite_id: { type: 'string' } }, required: ['suite_id'] },
-      handler: async (a: { suite_id: string }) => ok(await client.deleteTestSuite(a.suite_id)),
     },
     {
       name: 'treeflow_import_test_suite_csv',
