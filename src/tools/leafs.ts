@@ -1,6 +1,69 @@
+import { randomUUID } from 'node:crypto';
 import { TreeflowClient } from '../client/treeflowClient.js';
 import { DETAIL_HINT, branchOutline, canvasNames, leafLine } from './resumen.js';
 import { ok } from './util.js';
+
+export interface NewLeaf {
+  ref?: string;
+  leaf_type: string;
+  name?: string;
+  config?: Record<string, any>;
+  position_x?: number;
+  position_y?: number;
+  is_start?: boolean;
+}
+
+/** Sustituye cada "ref:<ref>" del valor (a cualquier profundidad) por el ID asignado. */
+export function resolveRefs(value: any, ids: Map<string, string>): any {
+  if (typeof value === 'string' && value.startsWith('ref:')) {
+    const id = ids.get(value.slice(4));
+    if (!id) throw new Error(`"${value}" no corresponde a ninguna hoja de la lista (refs: ${[...ids.keys()].join(', ')}).`);
+    return id;
+  }
+  if (Array.isArray(value)) return value.map((v) => resolveRefs(v, ids));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolveRefs(v, ids)]));
+  }
+  return value;
+}
+
+// Los IDs se asignan antes de crear, así una hoja puede apuntar a otra que todavía no
+// existe y todo queda enlazado en una sola pasada, sin crear y luego corregir.
+async function createLeaves(client: TreeflowClient, branchId: string, leaves: NewLeaf[]) {
+  if (!Array.isArray(leaves) || !leaves.length) throw new Error('Manda al menos una hoja en leaves.');
+  const ids = new Map<string, string>();
+  for (const [i, leaf] of leaves.entries()) {
+    const ref = leaf.ref ?? leaf.name ?? `hoja${i + 1}`;
+    if (ids.has(ref)) throw new Error(`El ref "${ref}" está repetido: cada hoja de la lista necesita uno distinto.`);
+    ids.set(ref, randomUUID());
+  }
+  const refs = [...ids.keys()];
+  // Todo se valida antes de crear nada: un ref roto no deja la rama a medias.
+  const configs = leaves.map((leaf) => resolveRefs(leaf.config ?? {}, ids));
+
+  const created: any[] = [];
+  try {
+    for (const [i, leaf] of leaves.entries()) {
+      created.push(
+        await client.createLeaf(branchId, {
+          id: ids.get(refs[i]),
+          name: leaf.name,
+          type: leaf.leaf_type,
+          config: configs[i],
+          position_x: leaf.position_x ?? i * 320,
+          position_y: leaf.position_y ?? 0,
+          is_start: leaf.is_start,
+        })
+      );
+    }
+  } catch (e: any) {
+    const done = created.map((l) => `${l.name} [${l.id}]`).join(', ') || 'ninguna';
+    const detail = e?.response?.data?.detail ?? e?.message ?? e;
+    throw new Error(`Falló la hoja ${created.length + 1} (${refs[created.length]}): ${typeof detail === 'object' ? JSON.stringify(detail) : detail}. Ya creadas: ${done}.`);
+  }
+  const names = canvasNames([{ leaves: created }]);
+  return [`Hojas creadas (${created.length}):`, ...created.map((l) => leafLine(l, names))].join('\n');
+}
 
 export function registerLeafTools(client: TreeflowClient) {
   return [
@@ -25,42 +88,37 @@ export function registerLeafTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_create_leaf',
-      description: 'Crea un nuevo nodo (leaf) dentro de una rama. Tipos soportados: message, input, condition, action, webhook, trigger_context.',
+      description:
+        'Crea una o varias hojas en una rama, en una sola llamada. Las hojas nuevas se pueden enlazar entre sí: en ' +
+        'cualquier valor del config (nextLeafId, targetLeafId de intents/events…) escribe "ref:<ref>" con el ref de ' +
+        'otra hoja de la misma lista, y se sustituye por su ID. Tipos habituales: intent (responde a una intención: ' +
+        'intentName, messageText, nextLeafId), trigger_context (escucha intents/events y salta a su targetLeafId), ' +
+        'event (responde a un evento como sys.no-match). Sin posición, se colocan en fila.',
       inputSchema: {
         type: 'object',
         properties: {
           branch_id: { type: 'string', description: 'ID de la rama' },
-          leaf_type: { type: 'string', description: 'Tipo de nodo: message, input, condition, action, webhook, trigger_context' },
-          name: { type: 'string', description: 'Nombre del nodo. Si se omite se usa el tipo.' },
-          config: {
-            type: 'object',
-            description: 'Configuración JSON del nodo (ej. plantilla de mensaje, opciones, condiciones)',
+          leaves: {
+            type: 'array',
+            description: 'Hojas a crear, en orden',
+            items: {
+              type: 'object',
+              properties: {
+                ref: { type: 'string', description: 'Nombre corto para enlazarla desde otras hojas de la lista (default: name)' },
+                leaf_type: { type: 'string', description: 'intent, trigger_context, event…' },
+                name: { type: 'string', description: 'Nombre de la hoja (default: el tipo)' },
+                config: { type: 'object', description: 'Config de la hoja; admite "ref:<ref>" como ID' },
+                position_x: { type: 'number' },
+                position_y: { type: 'number' },
+                is_start: { type: 'boolean' },
+              },
+              required: ['leaf_type'],
+            },
           },
-          position_x: { type: 'number', description: 'Posición X en el lienzo (default 0)' },
-          position_y: { type: 'number', description: 'Posición Y en el lienzo (default 0)' },
-          is_start: { type: 'boolean', description: 'Marca el nodo como inicio de la rama' },
         },
-        required: ['branch_id', 'leaf_type'],
+        required: ['branch_id', 'leaves'],
       },
-      handler: async (args: {
-        branch_id: string;
-        leaf_type: string;
-        name?: string;
-        config?: any;
-        position_x?: number;
-        position_y?: number;
-        is_start?: boolean;
-      }) => {
-        const result = await client.createLeaf(args.branch_id, {
-          name: args.name,
-          type: args.leaf_type,
-          config: args.config || {},
-          position_x: args.position_x,
-          position_y: args.position_y,
-          is_start: args.is_start,
-        });
-        return ok(`Hoja creada: ${leafLine(result, canvasNames([]))}`);
-      },
+      handler: async (args: { branch_id: string; leaves: NewLeaf[] }) => ok(await createLeaves(client, args.branch_id, args.leaves)),
     },
     {
       name: 'treeflow_update_leaf',

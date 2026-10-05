@@ -40,6 +40,8 @@ console.log(`Bot de pruebas: ${T}`);
 // Restos de una corrida anterior que falló a medias
 for (const b of await client.listBranches(T)) if (b.name.startsWith('Rama e2e ')) await client.deleteBranch(b.id);
 for (const s of await client.listTestSuites(T)) if (s.name.startsWith('Suite e2e ')) await client.deleteTestSuite(s.id);
+for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
+for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
 
 const branches = await client.listBranches(T);
 const leaves = branches.flatMap((b) => (b.leaves ?? []).map((l) => ({ ...l, branchId: b.id })));
@@ -126,7 +128,7 @@ const rama = await measured('create_branch', { tree_id: T, name: `Rama e2e ${Dat
 const branchId = rama.match(/Rama "[^"]+" \[([^\]]+)\]/)?.[1];
 const startId = rama.match(/- Start \([^)]*\) \[([^\]]+)\]/)?.[1];
 assert.ok(branchId && startId, 'create_branch debe devolver el ID de la rama y el de su hoja Start');
-const hoja = await measured('create_leaf', { branch_id: branchId, leaf_type: 'message', name: 'Hoja e2e', config: { messageText: 'hola' } });
+const hoja = await measured('create_leaf', { branch_id: branchId, leaves: [{ leaf_type: 'message', name: 'Hoja e2e', config: { messageText: 'hola' } }] });
 const leafId = hoja.match(/\[([^\]]+)\]/)?.[1];
 assert.ok((await measured('update_leaf', { leaf_id: leafId, branch_id: branchId, config: { nextLeafId: startId } })).endsWith(`→ ${startId}`));
 await call('delete_leaf', { leaf_id: leafId });
@@ -147,6 +149,54 @@ assert.match(run, /Falla a propósito/);
 assert.ok(!run.includes('- Saludo'), 'lo que pasó no se repite');
 await call('delete_test_suite', { suite_id: suiteId });
 step('run_test_suite devuelve los totales y sólo el caso que falló (la suite se borró)');
+
+// ── Fase 4: menos vueltas ──
+const stamp = Date.now();
+const flujo = await measured('create_branch', { tree_id: T, name: `Rama e2e lote ${stamp}` });
+const flowBranch = flujo.match(/Rama "[^"]+" \[([^\]]+)\]/)[1];
+const lote = await measured('create_leaf', {
+  branch_id: flowBranch,
+  leaves: [
+    { ref: 'menu', leaf_type: 'trigger_context', name: 'Menu e2e', config: { intents: [{ name: `e2e_precio_${stamp}`, targetLeafId: 'ref:precio' }], events: [] } },
+    { ref: 'precio', leaf_type: 'intent', name: 'Precio e2e', config: { intentName: `e2e_precio_${stamp}`, isCustomResponse: true, messageText: 'Cuesta 30 pesos', nextLeafId: 'ref:menu' } },
+    { ref: 'nomatch', leaf_type: 'event', name: 'No entiendo e2e', config: { eventName: 'sys.no-match', messageText: 'No te entendí', nextLeafId: 'ref:menu' } },
+  ],
+});
+const created = [...lote.matchAll(/- (.+?) \([^)]*\) \[([^\]]+)\]/g)].map((m) => ({ name: m[1], id: m[2] }));
+assert.equal(created.length, 3, 'deben crearse las tres hojas');
+const [menuLeaf, precioLeaf] = created;
+const menuSaved = await json('get_detail', { tree_id: T, tipo: 'leaf', ref: menuLeaf.id });
+const precioSaved = await json('get_detail', { tree_id: T, tipo: 'leaf', ref: precioLeaf.id });
+assert.equal(menuSaved.config.intents[0].targetLeafId, precioLeaf.id);
+assert.equal(precioSaved.config.nextLeafId, menuLeaf.id);
+step('create_leaf creó 3 hojas enlazadas entre sí en una llamada (enlaces verificados releyéndolas)');
+
+const nuevas = await measured('create_intent', {
+  tree_id: T,
+  intents: [
+    { name: `e2e_precio_${stamp}`, patterns: ['cuánto cuesta el zafiro azul', 'precio del zafiro azul', 'qué vale el zafiro azul'] },
+    { name: `e2e_horario_${stamp}`, patterns: ['a qué hora abre la joyería', 'horario de la joyería'] },
+  ],
+});
+assert.match(nuevas, /^Intenciones creadas: 2 de 2/);
+assert.match(await measured('create_entity', { tree_id: T, entities: [{ name: `e2e_gema_${stamp}`, values: [{ key: 'zafiro', synonyms: ['zafiros'] }] }] }), /^Entidades creadas: 1 de 1/);
+step('create_intent y create_entity crearon en lote');
+
+// Si el entrenamiento incluyó las nuevas, cuenta las mismas intenciones que hay ahora.
+// (Simular una frase no lo prueba: el motor sólo considera las intenciones conectadas a
+// la hoja actual, y una coincidencia exacta de entidad de la plantilla gana antes.)
+const intentsNow = (await client.listIntents(T)).length;
+const entrenado = await measured('trigger_training', { tree_id: T });
+assert.match(entrenado, /^Entrenamiento terminado .* can_use true/);
+assert.match(entrenado, new RegExp(` ${intentsNow} intenciones`), 'el entrenamiento debe incluir las intenciones recién creadas');
+step(`trigger_training esperó hasta el final (${entrenado.match(/en (\d+) s/)[1]} s) e incluyó las ${intentsNow} intenciones`);
+
+// Limpieza: el bot de pruebas queda como estaba
+for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
+for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
+await client.deleteBranch(flowBranch);
+await client.trainAndWait(T, { force: true });
+step('limpieza: intenciones, entidad y rama de prueba borradas, y el bot reentrenado');
 
 console.log('\nTamaño de las respuestas (caracteres):');
 for (const [k, v] of Object.entries(sizes)) console.log(`  ${k.padEnd(20)} ${v}`);

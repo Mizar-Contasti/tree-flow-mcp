@@ -235,11 +235,13 @@ export class TreeflowClient {
     return branch?.leaves ?? [];
   }
 
+  // Con `id` la hoja nace con ese UUID: permite enlazar hojas nuevas entre sí antes de crearlas.
   async createLeaf(
     branchId: string,
-    data: { name?: string; type: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean }
+    data: { id?: string; name?: string; type: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean }
   ) {
     const response = await this.client.post(`/design/branches/${branchId}/leaves`, {
+      ...(data.id ? { id: data.id } : {}),
       name: data.name || data.type,
       type: data.type,
       position_x: data.position_x ?? 0,
@@ -808,9 +810,29 @@ export class TreeflowClient {
   }
 
   // --- 10. ENTRENAMIENTO & HISTORIAL ML ---
-  async triggerTraining(treeId: string) {
-    const response = await this.client.post(`/train/${treeId}`);
+  async triggerTraining(treeId: string, force = false) {
+    const response = await this.client.post(`/train/${treeId}`, undefined, { params: force ? { force: true } : {} });
     return response.data;
+  }
+
+  /**
+   * Entrena y espera a que termine, para que el modelo no tenga que consultar el estado
+   * una y otra vez (cada consulta es otra llamada que reenvía toda la conversación).
+   */
+  async trainAndWait(treeId: string, options: { force?: boolean; timeoutMs?: number; pollMs?: number } = {}) {
+    const { force = false, timeoutMs = 90_000, pollMs = 1_500 } = options;
+    const started = Date.now();
+    const queued = await this.triggerTraining(treeId, force);
+    if (queued?.status === 'skipped') return { outcome: 'skipped' as const, queued, status: await this.getTrainingStatus(treeId) };
+    let status = await this.getTrainingStatus(treeId);
+    while (['pendiente', 'en_proceso'].includes(status?.status) && Date.now() - started < timeoutMs) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      status = await this.getTrainingStatus(treeId);
+    }
+    const running = ['pendiente', 'en_proceso'].includes(status?.status);
+    // El error, si lo hubo, sólo está en el historial.
+    const last = running ? undefined : (await this.listTrainingHistory(treeId, 1, 1).catch(() => undefined))?.items?.[0];
+    return { outcome: running ? ('running' as const) : ('finished' as const), queued, status, last, seconds: (Date.now() - started) / 1000 };
   }
 
   async getTrainingStatus(treeId: string) {

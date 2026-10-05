@@ -1,6 +1,21 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
 import { DETAIL_HINT, intentLine, intentsSummary } from './resumen.js';
-import { ok } from './util.js';
+import { inBatch, ok } from './util.js';
+
+// Esquema de los parámetros de una intención, compartido por crear y actualizar.
+const paramsSchema = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Nombre del parámetro/variable' },
+      entity_name: { type: 'string', description: 'Entidad asignada (ej. sys.number, @tipo_habitacion)' },
+      required: { type: 'boolean', description: 'Si el slot es obligatorio' },
+      prompt: { type: 'string', description: 'Pregunta si falta el valor' },
+    },
+    required: ['name', 'entity_name'],
+  },
+};
 
 export function registerIntentTools(client: TreeflowClient) {
   return [
@@ -21,44 +36,35 @@ export function registerIntentTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_create_intent',
-      description: 'Crea una nueva intención NLU con frases de entrenamiento (patterns) y slots de parámetros requeridos (ej. fecha, cantidad, tipo_habitacion).',
+      description:
+        'Crea una o varias intenciones NLU en una sola llamada, cada una con sus frases de entrenamiento y sus ' +
+        'parámetros (slots). Si una falla, las demás se crean igual y se dice cuál falló. Después hay que reentrenar.',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
-          name: { type: 'string', description: 'Nombre único de la intención (ej. saludo, reservar_mesa, consultar_precio)' },
-          patterns: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Lista de frases de entrenamiento que activarán esta intención',
-          },
-          entities: {
+          intents: {
             type: 'array',
             items: {
               type: 'object',
               properties: {
-                name: { type: 'string', description: 'Nombre del parámetro/variable' },
-                entity_name: { type: 'string', description: 'Nombre de la entidad asignada (ej. sys.number, @tipo_habitacion)' },
-                required: { type: 'boolean', description: 'Si el slot es obligatorio' },
-                prompt: { type: 'string', description: 'Pregunta de repregunta si falta el valor' },
+                name: { type: 'string', description: 'Nombre único (ej. reservar_mesa)' },
+                patterns: { type: 'array', items: { type: 'string' }, description: 'Frases de entrenamiento; entidades como @nombre' },
+                entities: { ...paramsSchema, description: 'Parámetros a extraer' },
+                type: { type: 'string', description: 'conversational (default) o contextual' },
               },
-              required: ['name', 'entity_name'],
+              required: ['name', 'patterns'],
             },
-            description: 'Parámetros o slots a extraer en esta intención',
           },
-          type: { type: 'string', description: 'Tipo: conversational o contextual. Por defecto: conversational' },
         },
-        required: ['tree_id', 'name', 'patterns'],
+        required: ['tree_id', 'intents'],
       },
-      handler: async (args: { tree_id: string; name: string; patterns: string[]; entities?: any[]; type?: string }) => {
-        const result = await client.createIntent(args.tree_id, {
-          name: args.name,
-          patterns: args.patterns,
-          entities: args.entities,
-          type: args.type || 'conversational',
-        });
-        return ok(`Intención creada: ${intentLine(result)}`);
-      },
+      handler: async (args: { tree_id: string; intents: { name: string; patterns: string[]; entities?: any[]; type?: string }[] }) =>
+        ok(
+          await inBatch('Intenciones', args.intents, (i) => i.name, async (i) =>
+            intentLine(await client.createIntent(args.tree_id, { ...i, type: i.type || 'conversational' }))
+          )
+        ),
     },
     {
       name: 'treeflow_update_intent',
@@ -75,20 +81,7 @@ export function registerIntentTools(client: TreeflowClient) {
           add_patterns: { type: 'array', items: { type: 'string' }, description: 'Frases a añadir (las repetidas se ignoran)' },
           remove_patterns: { type: 'array', items: { type: 'string' }, description: 'Frases a quitar, escritas igual' },
           patterns: { type: 'array', items: { type: 'string' }, description: 'Sustituye TODAS las frases' },
-          entities: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                entity_name: { type: 'string' },
-                required: { type: 'boolean' },
-                prompt: { type: 'string' },
-              },
-              required: ['name', 'entity_name'],
-            },
-            description: 'Sustituye TODOS los parámetros',
-          },
+          entities: { ...paramsSchema, description: 'Sustituye TODOS los parámetros' },
         },
         required: ['tree_id', 'intent_id'],
       },

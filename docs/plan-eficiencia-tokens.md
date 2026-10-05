@@ -159,11 +159,32 @@ descripciones nuevos de las fases 1–3. Recortarlo es la fase 5.
 Listo cuando: ninguna escritura devuelve el objeto completo y ningún listado es ilimitado.
 
 ### Fase 4 — Menos vueltas
-- [ ] `trigger_training` espera a que el entrenamiento termine y devuelve el estado final.
-- [ ] Crear varias intenciones o entidades en una llamada.
-- [ ] Crear varias hojas de una rama en una llamada, enlazadas entre sí.
+- [x] `trigger_training` espera a que el entrenamiento termine (hasta 90 s, ajustable) y
+      devuelve el resultado final con `can_use` y, si falló, el error del historial.
+      Fuerza por defecto: ver el hallazgo del reloj más abajo.
+- [x] `create_intent` y `create_entity` reciben listas; una que falla no detiene a las
+      demás y se informa en su línea.
+- [x] `create_leaf` recibe una lista de hojas enlazadas entre sí con `"ref:<ref>"`. Los
+      UUID se asignan antes de crear (el backend acepta `id`), así que todo queda enlazado
+      en una pasada; un ref roto se rechaza antes de crear nada. Sin posición, las hojas
+      van en fila en vez de amontonarse en (0,0).
+- [x] La descripción de `create_leaf` ofrecía tipos que el motor no usa (`input`,
+      `condition`, `action`, `webhook`); ahora explica `intent`, `trigger_context` y `event`.
 
-Listo cuando: un flujo nuevo de varias hojas se arma en una o dos llamadas.
+Verificado en dev: tres hojas enlazadas en una llamada (enlaces comprobados releyéndolas),
+dos intenciones y una entidad en lote, y un entrenamiento que esperó 3 s e incluyó las
+intenciones nuevas.
+
+**Hallazgo en el backend (fuera de este plan): el estado de entrenamiento compara relojes
+distintos.** `training_history.completed_at` se guarda en UTC
+(`datetime.now(timezone.utc).replace(tzinfo=None)` en `api/train.py`) y
+`change_history.created_at` en hora local de la base (`now()`, -06 en dev); las dos
+columnas son `timestamp without time zone`. `get_training_status` busca cambios
+posteriores al último entrenamiento, y durante las 6 horas siguientes a cualquier
+entrenamiento ningún cambio lo parece: el estado dice "updated" y `POST /train` sin
+`force` **se salta el entrenamiento** aunque haya intenciones nuevas. Medido en dev:
+último entrenamiento `23:47:08`, último cambio `17:47:31` del mismo día, 23 s después en
+tiempo real. Falta comprobar la zona horaria de la base de producción.
 
 ### Fase 5 — Catálogo más liviano
 - [ ] Grupos de herramientas (`TREEFLOW_TOOLSETS`). **Pendiente de decidir**: qué grupo
@@ -189,6 +210,6 @@ Listo cuando: el catálogo por defecto ronda los 5,000 tokens.
 | 1 | hecha | `get_tree_data` 426,573 → 41,347 car. (9.7%); `export_tree` 14.6 M → 339; ninguna otra lectura pasa de 9,400 |
 | 2 | hecha | `scripts/e2e-dev.mjs` pasa contra dev: editar una clave conserva las demás en hojas, intenciones, entidades y canales |
 | 3 | hecha | Escrituras de 350–850 a 90–230 car.; `simulate_message` 2,024 → 490; `list_trees` 3,691 → 444 |
-| 4 | pendiente | |
+| 4 | hecha | Un flujo de 3 hojas enlazadas en 1 llamada; entrenar en 1 llamada en vez de 1 + N consultas |
 | 5 | pendiente | |
 | 6 | pendiente | |

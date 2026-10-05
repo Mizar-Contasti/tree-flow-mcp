@@ -77,6 +77,7 @@ export declare class TreeflowClient {
     deleteBranch(branchId: string): Promise<any>;
     listLeafs(branchId: string): Promise<any>;
     createLeaf(branchId: string, data: {
+        id?: string;
         name?: string;
         type: string;
         position_x?: number;
@@ -248,7 +249,28 @@ export declare class TreeflowClient {
     configureIntegration(treeId: string, integrationKey: string, enabled: boolean, config?: any): Promise<any>;
     getVoiceConfig(treeId: string): Promise<any>;
     updateVoiceConfig(treeId: string, data: Record<string, any>): Promise<any>;
-    triggerTraining(treeId: string): Promise<any>;
+    triggerTraining(treeId: string, force?: boolean): Promise<any>;
+    /**
+     * Entrena y espera a que termine, para que el modelo no tenga que consultar el estado
+     * una y otra vez (cada consulta es otra llamada que reenvía toda la conversación).
+     */
+    trainAndWait(treeId: string, options?: {
+        force?: boolean;
+        timeoutMs?: number;
+        pollMs?: number;
+    }): Promise<{
+        outcome: "skipped";
+        queued: any;
+        status: any;
+        last?: undefined;
+        seconds?: undefined;
+    } | {
+        outcome: "running" | "finished";
+        queued: any;
+        status: any;
+        last: any;
+        seconds: number;
+    }>;
     getTrainingStatus(treeId: string): Promise<any>;
     listTrainingHistory(treeId: string, page?: number, pageSize?: number): Promise<any>;
     simulateChatMessage(treeId: string, message: string, sessionId?: string): Promise<any>;

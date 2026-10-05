@@ -1,5 +1,5 @@
 import { DETAIL_HINT, entitiesSummary, entityLine } from './resumen.js';
-import { ok } from './util.js';
+import { inBatch, ok } from './util.js';
 export function registerEntityTools(client) {
     return [
         {
@@ -17,39 +17,40 @@ export function registerEntityTools(client) {
         },
         {
             name: 'treeflow_create_entity',
-            description: 'Crea una nueva entidad NLU (simple con sinónimos, compuesta o por expresión regular regex).',
+            description: 'Crea una o varias entidades NLU en una sola llamada: simple (valores con sinónimos), composite o regex. Si ' +
+                'una falla, las demás se crean igual y se dice cuál falló. Después hay que reentrenar.',
             inputSchema: {
                 type: 'object',
                 properties: {
                     tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    name: { type: 'string', description: 'Nombre de la entidad (ej. tipo_habitacion, ciudad, horario)' },
-                    type: { type: 'string', enum: ['simple', 'composite', 'regex'], description: 'Tipo de entidad. Default: simple' },
-                    values: {
+                    entities: {
                         type: 'array',
-                        description: 'Valores canónicos y sus sinónimos para entidades simple/composite',
                         items: {
                             type: 'object',
                             properties: {
-                                key: { type: 'string', description: 'Valor canónico (o value)' },
-                                value: { type: 'string', description: 'Valor canónico alternativo' },
-                                synonyms: { type: 'array', items: { type: 'string' }, description: 'Sinónimos que mapean a este valor' },
-                                entity: { type: 'string', description: 'Sub-entidad si es compuesta' },
+                                name: { type: 'string', description: 'Nombre (ej. tipo_habitacion)' },
+                                type: { type: 'string', enum: ['simple', 'composite', 'regex'], description: 'Default: simple' },
+                                values: {
+                                    type: 'array',
+                                    description: 'Valores canónicos con sus sinónimos (simple/composite)',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            key: { type: 'string', description: 'Valor canónico' },
+                                            synonyms: { type: 'array', items: { type: 'string' } },
+                                            entity: { type: 'string', description: 'Sub-entidad si es compuesta' },
+                                        },
+                                    },
+                                },
+                                pattern: { type: 'string', description: 'Patrón si es regex (ej. ^[0-9]{5}$)' },
                             },
+                            required: ['name'],
                         },
                     },
-                    pattern: { type: 'string', description: 'Patrón regex si el tipo es regex (ej. ^[0-9]{5}$)' },
                 },
-                required: ['tree_id', 'name'],
+                required: ['tree_id', 'entities'],
             },
-            handler: async (args) => {
-                const result = await client.createEntity(args.tree_id, {
-                    name: args.name,
-                    type: args.type || 'simple',
-                    values: args.values || [],
-                    pattern: args.pattern,
-                });
-                return ok(`Entidad creada: ${entityLine(result)}`);
-            },
+            handler: async (args) => ok(await inBatch('Entidades', args.entities, (e) => e.name, async (e) => entityLine(await client.createEntity(args.tree_id, { ...e, type: e.type || 'simple', values: e.values || [] })))),
         },
         {
             name: 'treeflow_update_entity',

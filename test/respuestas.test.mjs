@@ -79,8 +79,8 @@ test('las escrituras devuelven una línea con el ID, no el objeto entero', async
   const rama = texto(await tools.create_branch.handler({ tree_id: fx.TREE_ID, name: 'Reservas' }));
   assert.match(rama, /Rama "Reservas" \[rama-nueva\] · inicio: Start · 1 hojas\n  - Start \(trigger_context, inicio\) \[hoja-start-nueva\]/);
   assert.ok(!rama.includes('created_at') && !rama.includes('view_x'));
-  assert.match(texto(await tools.create_leaf.handler({ branch_id: 'rama-nueva', leaf_type: 'intent' })), /^Hoja creada: - Saludo \(intent\) \[hoja-nueva\]/);
-  assert.match(texto(await tools.create_intent.handler({ tree_id: fx.TREE_ID, name: 'x', patterns: ['y'] })), /^Intención creada: - consultar_precio \[int-precio\]/);
+  assert.match(texto(await tools.create_leaf.handler({ branch_id: 'rama-nueva', leaves: [{ leaf_type: 'intent' }] })), /^Hojas creadas \(1\):\n- Saludo \(intent\) \[hoja-nueva\]/);
+  assert.match(texto(await tools.create_intent.handler({ tree_id: fx.TREE_ID, intents: [{ name: 'x', patterns: ['y'] }] })), /^Intenciones creadas: 1 de 1\n- consultar_precio \[int-precio\]/);
   assert.match(texto(await tools.create_tree.handler({ name: 'Bot de pruebas' })), new RegExp(`^Bot creado: Bot "Bot de pruebas" \\[${fx.TREE_ID}\\]`));
 });
 

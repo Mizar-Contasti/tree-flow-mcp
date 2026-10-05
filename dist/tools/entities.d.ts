@@ -9,13 +9,14 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            entities?: undefined;
+            entity_id?: undefined;
             name?: undefined;
             type?: undefined;
-            values?: undefined;
-            pattern?: undefined;
-            entity_id?: undefined;
             add_values?: undefined;
             remove_values?: undefined;
+            values?: undefined;
+            pattern?: undefined;
         };
         required: string[];
     };
@@ -37,59 +38,69 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            name: {
+            entities: {
                 type: string;
-                description: string;
-            };
-            type: {
-                type: string;
-                enum: string[];
-                description: string;
-            };
-            values: {
-                type: string;
-                description: string;
                 items: {
                     type: string;
                     properties: {
-                        key: {
+                        name: {
                             type: string;
                             description: string;
                         };
-                        value: {
+                        type: {
                             type: string;
+                            enum: string[];
                             description: string;
                         };
-                        synonyms: {
+                        values: {
                             type: string;
+                            description: string;
                             items: {
                                 type: string;
+                                properties: {
+                                    key: {
+                                        type: string;
+                                        description: string;
+                                    };
+                                    synonyms: {
+                                        type: string;
+                                        items: {
+                                            type: string;
+                                        };
+                                    };
+                                    entity: {
+                                        type: string;
+                                        description: string;
+                                    };
+                                };
                             };
-                            description: string;
                         };
-                        entity: {
+                        pattern: {
                             type: string;
                             description: string;
                         };
                     };
+                    required: string[];
                 };
             };
-            pattern: {
-                type: string;
-                description: string;
-            };
             entity_id?: undefined;
+            name?: undefined;
+            type?: undefined;
             add_values?: undefined;
             remove_values?: undefined;
+            values?: undefined;
+            pattern?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         tree_id: string;
-        name: string;
-        type?: string;
-        values?: any[];
-        pattern?: string;
+        entities: {
+            name: string;
+            type?: string;
+            values?: any[];
+            pattern?: string;
+        }[];
     }) => Promise<{
         content: {
             type: string;
@@ -153,22 +164,18 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                     properties: {
                         key: {
                             type: string;
-                            description?: undefined;
                         };
                         value: {
                             type: string;
-                            description?: undefined;
                         };
                         synonyms: {
                             type: string;
                             items: {
                                 type: string;
                             };
-                            description?: undefined;
                         };
                         entity: {
                             type: string;
-                            description?: undefined;
                         };
                     };
                 };
@@ -177,6 +184,7 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            entities?: undefined;
         };
         required: string[];
     };
@@ -209,12 +217,13 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            entities?: undefined;
             name?: undefined;
             type?: undefined;
-            values?: undefined;
-            pattern?: undefined;
             add_values?: undefined;
             remove_values?: undefined;
+            values?: undefined;
+            pattern?: undefined;
         };
         required: string[];
     };

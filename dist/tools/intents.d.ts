@@ -9,13 +9,13 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            name?: undefined;
-            patterns?: undefined;
-            entities?: undefined;
-            type?: undefined;
+            intents?: undefined;
             intent_id?: undefined;
+            name?: undefined;
             add_patterns?: undefined;
             remove_patterns?: undefined;
+            patterns?: undefined;
+            entities?: undefined;
         };
         required: string[];
     };
@@ -37,18 +37,7 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            name: {
-                type: string;
-                description: string;
-            };
-            patterns: {
-                type: string;
-                items: {
-                    type: string;
-                };
-                description: string;
-            };
-            entities: {
+            intents: {
                 type: string;
                 items: {
                     type: string;
@@ -57,39 +46,64 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                             type: string;
                             description: string;
                         };
-                        entity_name: {
+                        patterns: {
                             type: string;
+                            items: {
+                                type: string;
+                            };
                             description: string;
                         };
-                        required: {
-                            type: string;
+                        entities: {
                             description: string;
+                            type: string;
+                            items: {
+                                type: string;
+                                properties: {
+                                    name: {
+                                        type: string;
+                                        description: string;
+                                    };
+                                    entity_name: {
+                                        type: string;
+                                        description: string;
+                                    };
+                                    required: {
+                                        type: string;
+                                        description: string;
+                                    };
+                                    prompt: {
+                                        type: string;
+                                        description: string;
+                                    };
+                                };
+                                required: string[];
+                            };
                         };
-                        prompt: {
+                        type: {
                             type: string;
                             description: string;
                         };
                     };
                     required: string[];
                 };
-                description: string;
-            };
-            type: {
-                type: string;
-                description: string;
             };
             intent_id?: undefined;
+            name?: undefined;
             add_patterns?: undefined;
             remove_patterns?: undefined;
+            patterns?: undefined;
+            entities?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         tree_id: string;
-        name: string;
-        patterns: string[];
-        entities?: any[];
-        type?: string;
+        intents: {
+            name: string;
+            patterns: string[];
+            entities?: any[];
+            type?: string;
+        }[];
     }) => Promise<{
         content: {
             type: string;
@@ -136,32 +150,32 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 description: string;
             };
             entities: {
+                description: string;
                 type: string;
                 items: {
                     type: string;
                     properties: {
                         name: {
                             type: string;
-                            description?: undefined;
+                            description: string;
                         };
                         entity_name: {
                             type: string;
-                            description?: undefined;
+                            description: string;
                         };
                         required: {
                             type: string;
-                            description?: undefined;
+                            description: string;
                         };
                         prompt: {
                             type: string;
-                            description?: undefined;
+                            description: string;
                         };
                     };
                     required: string[];
                 };
-                description: string;
             };
-            type?: undefined;
+            intents?: undefined;
         };
         required: string[];
     };
@@ -193,12 +207,12 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            intents?: undefined;
             name?: undefined;
-            patterns?: undefined;
-            entities?: undefined;
-            type?: undefined;
             add_patterns?: undefined;
             remove_patterns?: undefined;
+            patterns?: undefined;
+            entities?: undefined;
         };
         required: string[];
     };

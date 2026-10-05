@@ -1,4 +1,15 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+export interface NewLeaf {
+    ref?: string;
+    leaf_type: string;
+    name?: string;
+    config?: Record<string, any>;
+    position_x?: number;
+    position_y?: number;
+    is_start?: boolean;
+}
+/** Sustituye cada "ref:<ref>" del valor (a cualquier profundidad) por el ID asignado. */
+export declare function resolveRefs(value: any, ids: Map<string, string>): any;
 export declare function registerLeafTools(client: TreeflowClient): ({
     name: string;
     description: string;
@@ -9,15 +20,16 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            leaf_type?: undefined;
+            leaves?: undefined;
+            leaf_id?: undefined;
+            tree_id?: undefined;
             name?: undefined;
+            leaf_type?: undefined;
             config?: undefined;
+            replace_config?: undefined;
             position_x?: undefined;
             position_y?: undefined;
             is_start?: undefined;
-            leaf_id?: undefined;
-            tree_id?: undefined;
-            replace_config?: undefined;
         };
         required: string[];
     };
@@ -39,44 +51,56 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            leaf_type: {
+            leaves: {
                 type: string;
                 description: string;
-            };
-            name: {
-                type: string;
-                description: string;
-            };
-            config: {
-                type: string;
-                description: string;
-            };
-            position_x: {
-                type: string;
-                description: string;
-            };
-            position_y: {
-                type: string;
-                description: string;
-            };
-            is_start: {
-                type: string;
-                description: string;
+                items: {
+                    type: string;
+                    properties: {
+                        ref: {
+                            type: string;
+                            description: string;
+                        };
+                        leaf_type: {
+                            type: string;
+                            description: string;
+                        };
+                        name: {
+                            type: string;
+                            description: string;
+                        };
+                        config: {
+                            type: string;
+                            description: string;
+                        };
+                        position_x: {
+                            type: string;
+                        };
+                        position_y: {
+                            type: string;
+                        };
+                        is_start: {
+                            type: string;
+                        };
+                    };
+                    required: string[];
+                };
             };
             leaf_id?: undefined;
             tree_id?: undefined;
+            name?: undefined;
+            leaf_type?: undefined;
+            config?: undefined;
             replace_config?: undefined;
+            position_x?: undefined;
+            position_y?: undefined;
+            is_start?: undefined;
         };
         required: string[];
     };
     handler: (args: {
         branch_id: string;
-        leaf_type: string;
-        name?: string;
-        config?: any;
-        position_x?: number;
-        position_y?: number;
-        is_start?: boolean;
+        leaves: NewLeaf[];
     }) => Promise<{
         content: {
             type: string;
@@ -129,6 +153,7 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            leaves?: undefined;
         };
         required: string[];
     };
@@ -160,14 +185,15 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 description: string;
             };
             branch_id?: undefined;
-            leaf_type?: undefined;
+            leaves?: undefined;
+            tree_id?: undefined;
             name?: undefined;
+            leaf_type?: undefined;
             config?: undefined;
+            replace_config?: undefined;
             position_x?: undefined;
             position_y?: undefined;
             is_start?: undefined;
-            tree_id?: undefined;
-            replace_config?: undefined;
         };
         required: string[];
     };

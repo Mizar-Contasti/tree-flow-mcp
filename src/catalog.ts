@@ -42,8 +42,12 @@ distintas.
 
 REENTRENAMIENTO OBLIGATORIO: después de crear, modificar o borrar intenciones o
 entidades, llama a treeflow_trigger_training. Si no lo haces, el motor NLU sigue
-usando el modelo viejo y tus cambios no surten efecto, sin aviso ni error.
-Confirma con treeflow_get_training_status: can_use debe quedar en true.
+usando el modelo viejo y tus cambios no surten efecto, sin aviso ni error. Espera a
+que termine y te dice si quedó listo (can_use): no hace falta consultar el estado.
+
+EN LOTE: treeflow_create_intent, treeflow_create_entity y treeflow_create_leaf reciben
+listas. Crea todo lo de un paso en una llamada, no una por pieza; y entrena una vez al
+final, no después de cada cambio. Las hojas nuevas se enlazan entre sí con "ref:<ref>".
 
 EXPLORAR: treeflow_get_tree_data da el esquema de todo el bot en una llamada (cada
 hoja en una línea, con su ID). Las lecturas resumen; el detalle completo de una pieza
