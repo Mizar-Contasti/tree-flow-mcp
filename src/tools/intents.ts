@@ -64,14 +64,19 @@ export function registerIntentTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_update_intent',
-      description: 'Actualiza el nombre, frases de entrenamiento o slots/parámetros de una intención existente.',
+      description:
+        'Actualiza una intención: nombre, frases o parámetros. Lo que no mandes se conserva. Para añadir o quitar ' +
+        'frases usa add_patterns / remove_patterns (no hace falta leerlas antes); patterns y entities, si los ' +
+        'mandas, sustituyen la lista completa. Después hay que reentrenar.',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
           intent_id: { type: 'string', description: 'ID de la intención' },
           name: { type: 'string', description: 'Nuevo nombre' },
-          patterns: { type: 'array', items: { type: 'string' }, description: 'Nuevas frases de entrenamiento' },
+          add_patterns: { type: 'array', items: { type: 'string' }, description: 'Frases a añadir (las repetidas se ignoran)' },
+          remove_patterns: { type: 'array', items: { type: 'string' }, description: 'Frases a quitar, escritas igual' },
+          patterns: { type: 'array', items: { type: 'string' }, description: 'Sustituye TODAS las frases' },
           entities: {
             type: 'array',
             items: {
@@ -84,16 +89,26 @@ export function registerIntentTools(client: TreeflowClient) {
               },
               required: ['name', 'entity_name'],
             },
-            description: 'Nuevos parámetros',
+            description: 'Sustituye TODOS los parámetros',
           },
         },
         required: ['tree_id', 'intent_id'],
       },
-      handler: async (args: { tree_id: string; intent_id: string; name?: string; patterns?: string[]; entities?: any[] }) => {
+      handler: async (args: {
+        tree_id: string;
+        intent_id: string;
+        name?: string;
+        patterns?: string[];
+        entities?: any[];
+        add_patterns?: string[];
+        remove_patterns?: string[];
+      }) => {
         const result = await client.updateIntent(args.tree_id, args.intent_id, {
           name: args.name,
           patterns: args.patterns,
           entities: args.entities,
+          add_patterns: args.add_patterns,
+          remove_patterns: args.remove_patterns,
         });
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

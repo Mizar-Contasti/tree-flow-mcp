@@ -19,14 +19,16 @@ export function registerIntegrationTools(client) {
         },
         {
             name: 'treeflow_configure_integration',
-            description: 'Activa, desactiva o actualiza la configuración de un canal o integración externa (ej. whatsapp, telegram, webchat).',
+            description: 'Activa, desactiva o ajusta un canal del bot. config se combina con lo guardado: manda sólo las claves que ' +
+                'cambian, con los mismos nombres que muestra treeflow_list_integrations (ej. web: {"primaryColor": "#0a0"}). ' +
+                'El token de Telegram no se configura aquí: se conecta desde el panel de Treeflow, que registra el webhook.',
             inputSchema: {
                 type: 'object',
                 properties: {
                     tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                    integration_key: { type: 'string', description: 'Clave de integración: whatsapp, telegram, webchat, etc.' },
+                    integration_key: { type: 'string', description: 'Clave del canal tal como sale en treeflow_list_integrations (web, telegram, whatsapp…)' },
                     enabled: { type: 'boolean', description: 'true para activar, false para desactivar' },
-                    config: { type: 'object', description: 'Configuración opcional (tokens, phone numbers, endpoints)' },
+                    config: { type: 'object', description: 'Claves del canal que cambian' },
                 },
                 required: ['tree_id', 'integration_key', 'enabled'],
             },

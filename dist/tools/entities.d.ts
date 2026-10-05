@@ -14,6 +14,8 @@ export declare function registerEntityTools(client: TreeflowClient): ({
             values?: undefined;
             pattern?: undefined;
             entity_id?: undefined;
+            add_values?: undefined;
+            remove_values?: undefined;
         };
         required: string[];
     };
@@ -77,6 +79,8 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                 description: string;
             };
             entity_id?: undefined;
+            add_values?: undefined;
+            remove_values?: undefined;
         };
         required: string[];
     };
@@ -115,8 +119,35 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                 enum: string[];
                 description: string;
             };
+            add_values: {
+                type: string;
+                description: string;
+                items: {
+                    type: string;
+                    properties: {
+                        key: {
+                            type: string;
+                        };
+                        synonyms: {
+                            type: string;
+                            items: {
+                                type: string;
+                            };
+                        };
+                    };
+                    required: string[];
+                };
+            };
+            remove_values: {
+                type: string;
+                items: {
+                    type: string;
+                };
+                description: string;
+            };
             values: {
                 type: string;
+                description: string;
                 items: {
                     type: string;
                     properties: {
@@ -141,7 +172,6 @@ export declare function registerEntityTools(client: TreeflowClient): ({
                         };
                     };
                 };
-                description?: undefined;
             };
             pattern: {
                 type: string;
@@ -157,6 +187,8 @@ export declare function registerEntityTools(client: TreeflowClient): ({
         type?: string;
         values?: any[];
         pattern?: string;
+        add_values?: any[];
+        remove_values?: string[];
     }) => Promise<{
         content: {
             type: string;
@@ -181,6 +213,8 @@ export declare function registerEntityTools(client: TreeflowClient): ({
             type?: undefined;
             values?: undefined;
             pattern?: undefined;
+            add_values?: undefined;
+            remove_values?: undefined;
         };
         required: string[];
     };

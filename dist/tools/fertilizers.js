@@ -102,7 +102,7 @@ export function registerFertilizerTools(client) {
                 },
                 required: ['tree_id', 'tool_id'],
             },
-            handler: async (a) => ok(await client.testTool(a.tree_id, a.tool_id, a.test_values)),
+            handler: async (a) => ok(maskSecrets(await client.testTool(a.tree_id, a.tool_id, a.test_values))),
         },
         {
             name: 'treeflow_list_tool_logs',

@@ -1,3 +1,4 @@
+import { maskUrl } from '../client/treeflowClient.js';
 // Resúmenes en texto para el modelo: una línea por pieza, con su ID para pedir el detalle.
 //
 // Todo lo que devuelve una herramienta se queda en la conversación y se vuelve a mandar
@@ -169,9 +170,9 @@ export function fertilizersSummary(config) {
     };
     const state = (x) => [x.status ? `estado ${x.status}` : '', x.enabled === false ? 'desactivada' : ''].filter(Boolean);
     return [
-        main ? `Webhook principal: ${main.enabled ? 'activo' : 'inactivo'}${main.url ? ` · ${clip(main.url, 80)}` : ''}` : 'Webhook principal: no configurado',
+        main ? `Webhook principal: ${main.enabled ? 'activo' : 'inactivo'}${main.url ? ` · ${clip(maskUrl(main.url), 80)}` : ''}` : 'Webhook principal: no configurado',
         `APIs (${tools.length}):`,
-        ...tools.map((t) => [`- ${t.name} [${t.id}] ${t.method ?? 'POST'} ${clip(t.url, 80)}`, ...state(t), ...io(t)].join(' · ')),
+        ...tools.map((t) => [`- ${t.name} [${t.id}] ${t.method ?? 'POST'} ${clip(maskUrl(t.url ?? ''), 80)}`, ...state(t), ...io(t)].join(' · ')),
         `Scripts (${scripts.length}):`,
         ...scripts.map((s) => [`- ${s.name} [${s.id}] ${s.language ?? 'python'}`, ...state(s), ...io(s)].join(' · ')),
         DETAIL_HINT.replace('tipo', 'tipo "tool" o "script"'),

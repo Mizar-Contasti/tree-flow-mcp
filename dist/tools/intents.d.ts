@@ -14,6 +14,8 @@ export declare function registerIntentTools(client: TreeflowClient): ({
             entities?: undefined;
             type?: undefined;
             intent_id?: undefined;
+            add_patterns?: undefined;
+            remove_patterns?: undefined;
         };
         required: string[];
     };
@@ -77,6 +79,8 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 description: string;
             };
             intent_id?: undefined;
+            add_patterns?: undefined;
+            remove_patterns?: undefined;
         };
         required: string[];
     };
@@ -108,6 +112,20 @@ export declare function registerIntentTools(client: TreeflowClient): ({
             };
             name: {
                 type: string;
+                description: string;
+            };
+            add_patterns: {
+                type: string;
+                items: {
+                    type: string;
+                };
+                description: string;
+            };
+            remove_patterns: {
+                type: string;
+                items: {
+                    type: string;
+                };
                 description: string;
             };
             patterns: {
@@ -153,6 +171,8 @@ export declare function registerIntentTools(client: TreeflowClient): ({
         name?: string;
         patterns?: string[];
         entities?: any[];
+        add_patterns?: string[];
+        remove_patterns?: string[];
     }) => Promise<{
         content: {
             type: string;
@@ -177,6 +197,8 @@ export declare function registerIntentTools(client: TreeflowClient): ({
             patterns?: undefined;
             entities?: undefined;
             type?: undefined;
+            add_patterns?: undefined;
+            remove_patterns?: undefined;
         };
         required: string[];
     };

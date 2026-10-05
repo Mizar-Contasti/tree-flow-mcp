@@ -77,6 +77,8 @@ Problemas encontrados:
   clave de prueba guardada en `.env`, que está en `.gitignore`. Las escrituras se prueban
   en un bot de pruebas, nunca en los árboles existentes.
 - **Rutas**: `npm run validate:routes` sigue pasando.
+- **De punta a punta**: `scripts/e2e-dev.mjs` crea (o reutiliza) el bot "MCP pruebas
+  (Claude)" en dev y ejercita las herramientas contra el backend real. No toca otros bots.
 
 ## Fases
 
@@ -110,15 +112,29 @@ ninguna lectura de la tabla pasa de ~20,000 caracteres, y cada hoja, intención 
 entidad sigue apareciendo con su ID.
 
 ### Fase 2 — Editar sin leer todo, y sin borrar
-- [ ] `update_leaf` combina el `config` nuevo con el guardado: sólo cambian las claves
+- [x] `update_leaf` combina el `config` nuevo con el guardado: sólo cambian las claves
       que se mandan, `null` borra una clave y `replace_config: true` sustituye todo.
-- [ ] Revisar las demás actualizaciones (plantillas, árbol, voz, integraciones, suites)
-      y dejar dicho en cada descripción qué listas se sustituyen completas.
-- [ ] Secretos en la URL de una API (`?key=…`, `token=…`): hoy salen enteros al modelo,
-      porque `maskSecrets` sólo mira campos con nombre de secreto. Enmascararlos al leer
-      **y** restaurarlos al guardar, para que un `update_tool` con la URL enmascarada no
-      escriba `***` encima de la clave real.
-- [ ] Corregir la regla de las instrucciones para que diga la verdad.
+      Necesita `branch_id` o `tree_id` para leer el guardado; sin ellos se niega en vez
+      de borrar. Reproducido en dev: con 1.1.0, mandar sólo `messageText` dejaba la hoja
+      sin `eventName`, `eventType` ni `isCustomResponse`.
+- [x] `update_intent` acepta `add_patterns`/`remove_patterns` y `update_entity`
+      `add_values`/`remove_values`: añadir una frase ya no exige leer y reenviar todas.
+- [x] `update_intent` ya no reenvía las `displayPatterns` viejas al cambiar las frases
+      (con el mismo número de frases, el backend las conservaba y la pantalla mostraba
+      frases que el bot ya no tenía).
+- [x] `configure_integration` guardaba la config anidada en `config`, donde el backend no
+      la lee: ahora la combina plana en el canal. Árbol, voz y plantillas ya aceptaban
+      cambios parciales; las descripciones dicen qué listas se sustituyen completas.
+- [x] Secretos en la URL (`?key=…`, `token=…`) de APIs, webhook y transferencias: se
+      enmascaran al leer y se restauran al guardar; un `***` que devuelva el modelo nunca
+      pisa el valor real (también en `authConfig` y `auth_token`).
+- [x] La regla de las instrucciones dice ahora la verdad sobre listas y config.
+
+Hallazgo fuera de este plan: el esquema de parámetros de `create_intent`/`update_intent`
+documenta `{ name, entity_name, required, prompt }`, pero el backend (`EntityDef` en
+`api/intents.py`) no tiene `entity_name` y lo descarta. En los parámetros guardados,
+`name` es el nombre de la **entidad** y `key`/`entityId` su ID. Un parámetro creado por
+el MCP queda sin entidad. Pendiente de corregir aparte.
 
 Listo cuando: en dev, cambiar sólo el `messageText` de una hoja conserva sus
 `intents`, su `nextLeafId` y sus `customResponses`.
@@ -161,7 +177,7 @@ Listo cuando: el catálogo por defecto ronda los 5,000 tokens.
 |---|---|---|
 | 0 | hecha | Línea base medida contra la API real; `npm test` y `npm run medir` |
 | 1 | hecha | `get_tree_data` 426,573 → 41,347 car. (9.7%); `export_tree` 14.6 M → 339; ninguna otra lectura pasa de 9,400 |
-| 2 | pendiente | |
+| 2 | hecha | `scripts/e2e-dev.mjs` pasa contra dev: editar una clave conserva las demás en hojas, intenciones, entidades y canales |
 | 3 | pendiente | |
 | 4 | pendiente | |
 | 5 | pendiente | |

@@ -1,3 +1,7 @@
+/** Combina un config por claves de primer nivel: lo enviado pisa lo guardado y null lo quita. */
+export declare function mergeConfig(current: Record<string, any>, patch: Record<string, any>): Record<string, any>;
+/** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
+export declare function editList(current: string[], add?: string[], remove?: string[]): string[];
 export interface ToolVariableInput {
     name: string;
     type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
@@ -31,7 +35,13 @@ export interface ScriptInput {
     enabled?: boolean;
     errorMessage?: Record<string, string>;
 }
+export declare const MASK = "***";
 export declare function maskSecrets<T>(value: T): T;
+export declare function maskUrl(url: string): string;
+/** Devuelve a la URL nueva los secretos que llegaron enmascarados, tomándolos de la guardada. */
+export declare function unmaskUrl(next: string, saved: string | undefined): string;
+/** Quita los valores enmascarados de un parche: un *** que vuelve del modelo no es un dato nuevo. */
+export declare function withoutMasked<T extends Record<string, any>>(patch: T): Partial<T>;
 export declare class TreeflowClient {
     private client;
     workspaceId: string;
@@ -74,6 +84,10 @@ export declare class TreeflowClient {
         config?: any;
         is_start?: boolean;
     }): Promise<any>;
+    findLeaf(leafId: string, where: {
+        branchId?: string;
+        treeId?: string;
+    }): Promise<any>;
     updateLeaf(leafId: string, data: {
         name?: string;
         type?: string;
@@ -81,6 +95,10 @@ export declare class TreeflowClient {
         position_y?: number;
         config?: any;
         is_start?: boolean;
+    }, options?: {
+        branchId?: string;
+        treeId?: string;
+        replaceConfig?: boolean;
     }): Promise<any>;
     deleteLeaf(leafId: string): Promise<any>;
     listIntents(treeId: string): Promise<any>;
@@ -96,6 +114,8 @@ export declare class TreeflowClient {
         patterns?: string[];
         entities?: any[];
         type?: string;
+        add_patterns?: string[];
+        remove_patterns?: string[];
     }): Promise<any>;
     deleteIntent(treeId: string, intentId: string): Promise<any>;
     listEntities(treeId: string): Promise<any>;
@@ -111,6 +131,8 @@ export declare class TreeflowClient {
         type?: string;
         values?: any[];
         pattern?: string;
+        add_values?: any[];
+        remove_values?: string[];
     }): Promise<any>;
     deleteEntity(treeId: string, entityId: string): Promise<any>;
     listMessageTemplates(treeId: string): Promise<any>;

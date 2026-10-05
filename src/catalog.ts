@@ -53,8 +53,11 @@ queda en la conversación y cuesta en cada llamada siguiente.
 PATRONES: dentro de las frases de una intención, las entidades se referencian con
 arroba, por ejemplo "quiero una @tipo_habitacion".
 
-ACTUALIZACIONES: en update sólo hace falta mandar el campo que cambia; el resto se
-conserva.
+ACTUALIZACIONES: en update sólo hace falta mandar lo que cambia; el resto se conserva.
+Una lista que mandes (frases, valores, parámetros, variables, casos) se sustituye
+entera; para añadir o quitar frases o valores usa add_patterns / remove_patterns y
+add_values / remove_values, que no obligan a leerlos antes. En treeflow_update_leaf el
+config se combina por claves (una en null se borra) y hace falta branch_id o tree_id.
 
 WORKSPACE: sale del API Key. No le pidas al usuario un workspace ni un ID de
 workspace.
@@ -72,8 +75,8 @@ cuerpo de las herramientas.
    cambiarla, pruébala con treeflow_test_tool: llama de verdad a la URL y devuelve
    estado ok / sin_datos / error. Los scripts igual (treeflow_test_script).
  - Los nombres de herramientas y scripts son únicos por bot.
- - Contraseñas y tokens salen enmascarados (***) al listar: es normal, los valores
-   reales siguen guardados y no se pierden al actualizar.
+ - Contraseñas, tokens y claves en la URL salen enmascarados (***): es normal. Los
+   valores reales siguen guardados, y un *** que devuelvas al actualizar no los pisa.
  - Las capturas son preguntas reutilizables del slot filling: cambiar una afecta a
    todos los parámetros que la usan, y surte efecto sin reentrenar.
  - Tras cambios de lógica, treeflow_run_test_suite detecta regresiones, y

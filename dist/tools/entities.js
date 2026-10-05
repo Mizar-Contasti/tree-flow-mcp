@@ -55,7 +55,9 @@ export function registerEntityTools(client) {
         },
         {
             name: 'treeflow_update_entity',
-            description: 'Actualiza los valores, tipo, sinónimos o patrón regex de una entidad existente.',
+            description: 'Actualiza una entidad: nombre, tipo, valores o patrón regex. Lo que no mandes se conserva. Para añadir ' +
+                'valores (o sinónimos a uno existente) usa add_values, y para quitarlos remove_values: no hace falta leerlos ' +
+                'antes. values, si lo mandas, sustituye la lista completa. Después hay que reentrenar.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -63,8 +65,19 @@ export function registerEntityTools(client) {
                     entity_id: { type: 'string', description: 'ID de la entidad' },
                     name: { type: 'string', description: 'Nuevo nombre' },
                     type: { type: 'string', enum: ['simple', 'composite', 'regex'], description: 'Tipo de entidad' },
+                    add_values: {
+                        type: 'array',
+                        description: 'Valores a añadir; si el valor ya existe, se le suman los sinónimos',
+                        items: {
+                            type: 'object',
+                            properties: { key: { type: 'string' }, synonyms: { type: 'array', items: { type: 'string' } } },
+                            required: ['key'],
+                        },
+                    },
+                    remove_values: { type: 'array', items: { type: 'string' }, description: 'Valores canónicos (key) a quitar' },
                     values: {
                         type: 'array',
+                        description: 'Sustituye TODOS los valores',
                         items: {
                             type: 'object',
                             properties: {
@@ -85,6 +98,8 @@ export function registerEntityTools(client) {
                     type: args.type,
                     values: args.values,
                     pattern: args.pattern,
+                    add_values: args.add_values,
+                    remove_values: args.remove_values,
                 });
                 return {
                     content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],

@@ -51,7 +51,9 @@ export function registerTemplateTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_update_message_template',
-      description: 'Actualiza una plantilla de mensaje existente (texto plano o bloques enriquecidos).',
+      description:
+        'Actualiza una plantilla de mensaje. Lo que no mandes se conserva; responses, si lo mandas, sustituye todos ' +
+        'los bloques.',
       inputSchema: {
         type: 'object',
         properties: {

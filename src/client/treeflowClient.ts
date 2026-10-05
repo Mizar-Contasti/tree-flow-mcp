@@ -11,6 +11,24 @@ function pickDefined<T extends Record<string, any>>(data: T): Partial<T> {
   return out as Partial<T>;
 }
 
+/** Combina un config por claves de primer nivel: lo enviado pisa lo guardado y null lo quita. */
+export function mergeConfig(current: Record<string, any>, patch: Record<string, any>) {
+  const out: Record<string, any> = { ...current };
+  for (const [k, v] of Object.entries(patch ?? {})) {
+    if (v === null) delete out[k];
+    else out[k] = v;
+  }
+  return out;
+}
+
+/** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
+export function editList(current: string[], add: string[] = [], remove: string[] = []) {
+  const drop = new Set(remove.map((s) => s.trim()));
+  const out = current.filter((s) => !drop.has(s.trim()));
+  for (const s of add) if (!out.some((x) => x.trim() === s.trim())) out.push(s);
+  return out;
+}
+
 // El backend valida los valores de entidad como { key, synonyms }.
 // Se acepta `value` como alias de `key` por comodidad al dictarlos.
 function normalizeEntityValues(values?: any[]) {
@@ -77,7 +95,7 @@ export interface ScriptInput {
 
 // Oculta secretos en lo que se devuelve al modelo. Los valores reales siguen en el
 // servidor y las actualizaciones los conservan: se parte siempre de la config guardada.
-const MASK = '***';
+export const MASK = '***';
 export function maskSecrets<T>(value: T): T {
   const secretKeys = new Set(['password', 'token', 'secretPhrase', 'auth_token', 'api_key', 'apiKey']);
   const walk = (v: any, key?: string): any => {
@@ -90,9 +108,37 @@ export function maskSecrets<T>(value: T): T {
       return out;
     }
     if (key && secretKeys.has(key) && typeof v === 'string' && v) return MASK;
+    if (key && /url$/i.test(key) && typeof v === 'string') return maskUrl(v);
     return v;
   };
   return walk(value);
+}
+
+// Una clave también puede ir en la URL (?key=…, &access_token=…). Se reconoce por el
+// nombre del parámetro; un valor con { $variable } no es un secreto sino una plantilla.
+const SECRET_PARAM = /(^|[^a-z])(api_?key|key|token|access_?token|secret|password|passwd|pwd|signature|sig|auth|credentials?)$/i;
+const QUERY_PARAM = /([?&])([^=&#]+)=([^&#]*)/g;
+
+export function maskUrl(url: string): string {
+  return url.replace(QUERY_PARAM, (m, sep, name, value) =>
+    value && value !== MASK && SECRET_PARAM.test(name) && !value.includes('{') ? `${sep}${name}=${MASK}` : m
+  );
+}
+
+/** Devuelve a la URL nueva los secretos que llegaron enmascarados, tomándolos de la guardada. */
+export function unmaskUrl(next: string, saved: string | undefined): string {
+  const old = new Map<string, string>();
+  for (const [, , name, value] of (saved ?? '').matchAll(QUERY_PARAM)) old.set(name, value);
+  return next.replace(QUERY_PARAM, (m, sep, name, value) =>
+    value === MASK && old.has(name) ? `${sep}${name}=${old.get(name)}` : m
+  );
+}
+
+/** Quita los valores enmascarados de un parche: un *** que vuelve del modelo no es un dato nuevo. */
+export function withoutMasked<T extends Record<string, any>>(patch: T): Partial<T> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(patch ?? {})) if (v !== MASK) out[k] = v;
+  return out as Partial<T>;
 }
 
 export class TreeflowClient {
@@ -204,13 +250,36 @@ export class TreeflowClient {
     return response.data;
   }
 
+  // No hay GET de una hoja suelta: se busca en su rama o, sin rama, en todo el bot.
+  async findLeaf(leafId: string, where: { branchId?: string; treeId?: string }) {
+    const branches = where.branchId ? [await this.getBranch(where.branchId)] : await this.listBranches(where.treeId!);
+    for (const branch of branches) {
+      const leaf = branch?.leaves?.find((l: any) => l.id === leafId);
+      if (leaf) return leaf;
+    }
+    throw new Error(`No existe la hoja ${leafId} en ${where.branchId ? `la rama ${where.branchId}` : `el bot ${where.treeId}`}.`);
+  }
+
+  // El PUT del backend sustituye el config entero. Para que mandar sólo lo que cambia no
+  // borre el resto, se parte del guardado: cada clave enviada lo pisa y null la quita.
   async updateLeaf(
     leafId: string,
-    data: { name?: string; type?: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean }
+    data: { name?: string; type?: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean },
+    options: { branchId?: string; treeId?: string; replaceConfig?: boolean } = {}
   ) {
     const body: Record<string, any> = {};
     for (const key of ['name', 'type', 'position_x', 'position_y', 'config', 'is_start'] as const) {
       if (data[key] !== undefined) body[key] = data[key];
+    }
+    if (body.config !== undefined && !options.replaceConfig) {
+      if (!options.branchId && !options.treeId) {
+        throw new Error(
+          'Para cambiar config sin borrar lo demás hace falta branch_id o tree_id (para leer el config guardado). ' +
+          'Si de verdad quieres sustituirlo entero, manda replace_config: true.'
+        );
+      }
+      const current = await this.findLeaf(leafId, options);
+      body.config = mergeConfig(current.config ?? {}, body.config);
     }
     const response = await this.client.put(`/design/leaves/${leafId}`, body);
     return response.data;
@@ -246,12 +315,21 @@ export class TreeflowClient {
 
   // IntentUpdate es un reemplazo completo (exige name, type y patterns),
   // asi que se parte del estado actual y encima van los campos recibidos.
-  async updateIntent(treeId: string, intentId: string, data: { name?: string; patterns?: string[]; entities?: any[]; type?: string }) {
+  async updateIntent(
+    treeId: string,
+    intentId: string,
+    data: { name?: string; patterns?: string[]; entities?: any[]; type?: string; add_patterns?: string[]; remove_patterns?: string[] }
+  ) {
     const current = await this.getIntent(treeId, intentId);
-    const response = await this.client.put(`/trees/${treeId}/intents/${intentId}`, {
-      ...current,
-      ...pickDefined(data),
-    });
+    const { add_patterns, remove_patterns, ...fields } = data;
+    const body: Record<string, any> = { ...current, ...pickDefined(fields) };
+    if (add_patterns?.length || remove_patterns?.length) {
+      body.patterns = editList(body.patterns ?? [], add_patterns, remove_patterns);
+    }
+    // displayPatterns va una a una con patterns. Si cambian las frases, reenviar las
+    // guardadas dejaría en pantalla frases viejas: sin ellas el backend las regenera.
+    if (JSON.stringify(body.patterns) !== JSON.stringify(current?.patterns)) delete body.displayPatterns;
+    const response = await this.client.put(`/trees/${treeId}/intents/${intentId}`, body);
     return response.data;
   }
 
@@ -286,12 +364,28 @@ export class TreeflowClient {
   }
 
   // EntityUpdate tambien es un reemplazo completo (exige name y type).
-  async updateEntity(treeId: string, entityId: string, data: { name?: string; type?: string; values?: any[]; pattern?: string }) {
+  async updateEntity(
+    treeId: string,
+    entityId: string,
+    data: { name?: string; type?: string; values?: any[]; pattern?: string; add_values?: any[]; remove_values?: string[] }
+  ) {
     const current = await this.getEntity(treeId, entityId);
+    const { add_values, remove_values, ...fields } = data;
+    let values = normalizeEntityValues(fields.values ?? current?.values);
+    if (remove_values?.length) {
+      const drop = new Set(remove_values.map((k) => k.trim()));
+      values = values.filter((v) => !drop.has(String(v.key).trim()));
+    }
+    // Un valor que ya existe no se duplica: se le suman los sinónimos nuevos.
+    for (const v of normalizeEntityValues(add_values)) {
+      const same = values.find((x) => x.key === v.key);
+      if (same) same.synonyms = [...new Set([...(same.synonyms ?? []), ...v.synonyms])];
+      else values.push(v);
+    }
     const response = await this.client.put(`/trees/${treeId}/entities/${entityId}`, {
       ...current,
-      ...pickDefined(data),
-      ...(data.values ? { values: normalizeEntityValues(data.values) } : {}),
+      ...pickDefined(fields),
+      values,
     });
     return response.data;
   }
@@ -391,8 +485,11 @@ export class TreeflowClient {
     const tool = this.pickById<any>(config.additionalFertilizers, toolId);
     if (!tool) throw new Error(`No existe la herramienta "${toolId}" en el bot ${treeId}.`);
     const { inputVariables, outputVariables, authConfig, ...simple } = patch;
-    Object.assign(tool, pickDefined(simple));
-    if (authConfig !== undefined) tool.authConfig = { ...(tool.authConfig || {}), ...authConfig };
+    const savedUrl = tool.url;
+    Object.assign(tool, withoutMasked(pickDefined(simple)));
+    // Lo que el modelo leyó enmascarado y devuelve tal cual no debe pisar el valor real.
+    if (typeof simple.url === 'string') tool.url = unmaskUrl(simple.url, savedUrl);
+    if (authConfig !== undefined) tool.authConfig = { ...(tool.authConfig || {}), ...withoutMasked(authConfig) };
     if (inputVariables !== undefined) tool.inputVariables = toVariables(inputVariables);
     if (outputVariables !== undefined) tool.outputVariables = toVariables(outputVariables);
     // Cualquier cambio invalida la validación anterior, como en el editor de la app.
@@ -554,7 +651,9 @@ export class TreeflowClient {
     ];
     const base: Record<string, any> = {};
     for (const k of keep) if (current?.[k] !== undefined && current?.[k] !== null) base[k] = current[k];
-    const response = await this.client.put(`/api/integrations/transfers/${treeId}/${configId}`, { ...base, ...pickDefined(patch) });
+    const changes: Record<string, any> = withoutMasked(pickDefined(patch));
+    if (typeof changes.endpoint_url === 'string') changes.endpoint_url = unmaskUrl(changes.endpoint_url, current?.endpoint_url);
+    const response = await this.client.put(`/api/integrations/transfers/${treeId}/${configId}`, { ...base, ...changes });
     return response.data;
   }
 
@@ -682,13 +781,17 @@ export class TreeflowClient {
     };
   }
 
+  // La configuración de cada canal vive plana en su injerto (injertos.web.primaryColor,
+  // injertos.telegram.token…): anidarla bajo `config` la guardaba donde nadie la lee.
+  // Los secretos enmascarados que vuelvan como *** los restaura el backend.
   async configureIntegration(treeId: string, integrationKey: string, enabled: boolean, config?: any) {
     const current = await this.listIntegrations(treeId);
     const injertos = { ...(current.injertos || {}) };
+    const existing = injertos[integrationKey];
     injertos[integrationKey] = {
-      ...(injertos[integrationKey] || {}),
+      ...(existing && typeof existing === 'object' ? existing : {}),
+      ...(config && typeof config === 'object' ? config : {}),
       enabled,
-      ...(config ? { config } : {}),
     };
     const response = await this.client.put(`/bots/${treeId}/injertos`, injertos);
     return response.data;

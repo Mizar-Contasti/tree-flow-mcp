@@ -66,14 +66,20 @@ export function registerLeafTools(client: TreeflowClient) {
     },
     {
       name: 'treeflow_update_leaf',
-      description: 'Actualiza el contenido, configuración o posición de un nodo (leaf) existente.',
+      description:
+        'Actualiza un nodo (leaf): nombre, tipo, posición o config. config se combina con el guardado: manda sólo ' +
+        'las claves que cambian (ej. {"messageText": "…"}), una clave en null se borra, y lo demás se conserva. ' +
+        'Una clave que es lista (intents, events) se sustituye completa. Para combinar hace falta branch_id o tree_id.',
       inputSchema: {
         type: 'object',
         properties: {
           leaf_id: { type: 'string', description: 'ID del nodo (leaf)' },
+          branch_id: { type: 'string', description: 'Rama del nodo (o tree_id): para leer su config guardado' },
+          tree_id: { type: 'string', description: 'Bot del nodo, si no tienes branch_id' },
           name: { type: 'string', description: 'Nuevo nombre del nodo' },
           leaf_type: { type: 'string', description: 'Nuevo tipo de nodo' },
-          config: { type: 'object', description: 'Nueva configuración del nodo' },
+          config: { type: 'object', description: 'Claves del config que cambian' },
+          replace_config: { type: 'boolean', description: 'true sustituye el config entero por el que mandas' },
           position_x: { type: 'number', description: 'Nueva posición X en el lienzo' },
           position_y: { type: 'number', description: 'Nueva posición Y en el lienzo' },
           is_start: { type: 'boolean', description: 'Marca el nodo como inicio de la rama' },
@@ -82,21 +88,28 @@ export function registerLeafTools(client: TreeflowClient) {
       },
       handler: async (args: {
         leaf_id: string;
+        branch_id?: string;
+        tree_id?: string;
         name?: string;
         leaf_type?: string;
         config?: any;
+        replace_config?: boolean;
         position_x?: number;
         position_y?: number;
         is_start?: boolean;
       }) => {
-        const result = await client.updateLeaf(args.leaf_id, {
-          name: args.name,
-          type: args.leaf_type,
-          config: args.config,
-          position_x: args.position_x,
-          position_y: args.position_y,
-          is_start: args.is_start,
-        });
+        const result = await client.updateLeaf(
+          args.leaf_id,
+          {
+            name: args.name,
+            type: args.leaf_type,
+            config: args.config,
+            position_x: args.position_x,
+            position_y: args.position_y,
+            is_start: args.is_start,
+          },
+          { branchId: args.branch_id, treeId: args.tree_id, replaceConfig: args.replace_config }
+        );
         return {
           content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
