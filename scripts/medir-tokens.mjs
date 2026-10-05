@@ -43,7 +43,7 @@ process.env.TREEFLOW_EXPORT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'treeflo
 
 const dist = (p) => import(pathToFileURL(path.join(ROOT, 'dist', p)).href);
 const { TreeflowClient } = await dist('client/treeflowClient.js');
-const { buildToolGroups, INSTRUCTIONS } = await dist('catalog.js');
+const { buildToolGroups, INSTRUCTIONS, TOOLSETS, buildInstructions, enableToolsTool, parseToolsets, toolsetOf } = await dist('catalog.js');
 
 const tok = (chars) => Math.round(chars / 3.5);
 const fmt = (n) => n.toLocaleString('es-MX');
@@ -66,6 +66,25 @@ result.catalogo.total = { herramientas: tools.length, caracteres: total };
 result.catalogo.instrucciones = { caracteres: INSTRUCTIONS.length };
 console.log(`  ${'TOTAL'.padEnd(14)} ${String(tools.length).padStart(2)} herr.  ${fmt(total).padStart(7)} car.  ~${fmt(tok(total))} tok`);
 console.log(`  instrucciones          ${fmt(INSTRUCTIONS.length).padStart(7)} car.  ~${fmt(tok(INSTRUCTIONS.length))} tok`);
+
+// Lo que de verdad viaja: los grupos activos (TREEFLOW_TOOLSETS o los de por defecto)
+console.log('\nPOR GRUPO');
+for (const group of ['base', ...Object.keys(TOOLSETS)]) {
+  const list = tools.filter((t) => toolsetOf(t.name) === group);
+  const chars = list.reduce((s, t) => s + toolChars(t), 0);
+  console.log(`  ${group.padEnd(14)} ${String(list.length).padStart(2)} herr.  ${fmt(chars).padStart(7)} car.  ~${fmt(tok(chars))} tok`);
+}
+const { active } = parseToolsets(process.env.TREEFLOW_TOOLSETS);
+const visible = tools.filter((t) => active.has(toolsetOf(t.name)));
+const enable = enableToolsTool(active, tools, async () => {});
+if (enable) visible.push(enable);
+const visibleChars = visible.reduce((s, t) => s + toolChars(t), 0);
+const instr = buildInstructions(active).length;
+result.porLlamada = { grupos: [...active], herramientas: visible.length, catalogo: visibleChars, instrucciones: instr };
+console.log(
+  `\nPOR LLAMADA con ${[...active].join(', ')}: ${visible.length} herr., ${fmt(visibleChars)} car. de catálogo + ` +
+  `${fmt(instr)} de instrucciones = ~${fmt(tok(visibleChars + instr))} tok`
+);
 
 // 2. Lecturas sobre un bot
 if (treeRef) {

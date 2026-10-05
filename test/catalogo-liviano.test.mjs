@@ -1,7 +1,7 @@
 // Fase 5: menos herramientas en el catálogo sin perder capacidades.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTools, INSTRUCTIONS } from '../dist/catalog.js';
+import { buildTools, INSTRUCTIONS, TOOLSETS, DEFAULT_TOOLSETS, buildInstructions, enableToolsTool, parseToolsets, toolsetOf } from '../dist/catalog.js';
 import { GUIDE } from '../dist/tools/guide.js';
 import { clienteFalso, texto } from './helpers.mjs';
 import * as fx from './fixtures.mjs';
@@ -51,6 +51,51 @@ test('ya no existen los create_/update_/delete_ que se juntaron', () => {
     'update_message_template', 'create_test_suite', 'delete_branch', 'delete_leaf', 'delete_intent', 'delete_entity']) {
     assert.ok(!names.includes(gone), `${gone} debería haberse juntado`);
   }
+});
+
+test('TREEFLOW_TOOLSETS: vacía da los de por defecto; una lista los sustituye; "todo" los activa todos', () => {
+  assert.deepEqual([...parseToolsets(undefined).active], ['base', ...DEFAULT_TOOLSETS]);
+  assert.deepEqual([...parseToolsets(' APIs , pruebas ').active], ['base', 'apis', 'pruebas']);
+  assert.deepEqual([...parseToolsets('todo').active], ['base', ...Object.keys(TOOLSETS)]);
+  assert.deepEqual(parseToolsets('apis,fantasma').unknown, ['fantasma']);
+});
+
+test('cada grupo tiene herramientas y la base no se queda con las de un grupo', () => {
+  const tools = buildTools(clienteFalso());
+  for (const group of Object.keys(TOOLSETS)) {
+    assert.ok(tools.some((t) => toolsetOf(t.name) === group), `el grupo ${group} no atrapa ninguna herramienta`);
+  }
+  for (const t of tools.filter((t) => toolsetOf(t.name) === 'base')) {
+    assert.ok(!/fertilizers|_tool$|script|test_suite|test_run|transfer|live_chat|backup|export_tree|import_tree|restore|users?$|credentials|voice|integration|history|analytics|capture/.test(t.name),
+      `${t.name} parece de un grupo opcional pero quedó en la base`);
+  }
+});
+
+test('las instrucciones sólo nombran herramientas de los grupos activos', () => {
+  const tools = buildTools(clienteFalso());
+  for (const value of [undefined, 'base', 'todo']) {
+    const { active } = parseToolsets(value);
+    const visible = new Set(tools.filter((t) => active.has(toolsetOf(t.name))).map((t) => t.name));
+    visible.add('treeflow_enable_tools');
+    for (const name of buildInstructions(active).match(/treeflow_[a-z_]+/g)) {
+      assert.ok(visible.has(name), `con ${value ?? 'por defecto'}, las instrucciones nombran ${name}, que no está activa`);
+    }
+  }
+  assert.ok(!INSTRUCTIONS.includes('enable_tools'), 'con todo activo no hay nada que activar');
+});
+
+test('treeflow_enable_tools activa grupos y avisa; desaparece cuando ya no queda ninguno', async () => {
+  const tools = buildTools(clienteFalso());
+  const active = new Set(['base']);
+  let avisos = 0;
+  const enable = enableToolsTool(active, tools, async () => { avisos++; });
+  assert.deepEqual(enable.inputSchema.properties.grupos.items.enum, Object.keys(TOOLSETS));
+  const out = texto(await enable.handler({ grupos: ['apis', 'no_existe'] }));
+  assert.ok(active.has('apis') && !active.has('no_existe'));
+  assert.equal(avisos, 1);
+  assert.match(out, /^Activados: apis\. Herramientas nuevas: treeflow_list_fertilizers, treeflow_save_tool/);
+  await assert.rejects(enable.handler({ grupos: [] }), /Grupos que se pueden activar/);
+  assert.equal(enableToolsTool(new Set(['base', ...Object.keys(TOOLSETS)]), tools, async () => {}), undefined);
 });
 
 test('la guía cubre cada tema que se menciona en el catálogo', async () => {

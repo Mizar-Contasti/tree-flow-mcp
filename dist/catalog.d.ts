@@ -5,6 +5,27 @@ export interface ToolDef {
     inputSchema: Record<string, any>;
     handler: (args: any) => Promise<any>;
 }
-export declare const INSTRUCTIONS = "Treeflow es una plataforma de chatbots NLU. Un \u00E1rbol (tree) es un bot.\nDos subsistemas que NO son lo mismo: el canvas (ramas = flujos, hojas = sus nodos; una rama\nnueva trae su hoja Start) y el NLU (intenciones con frases de entrenamiento, entidades con\nvalores y sin\u00F3nimos; en las frases, una entidad se escribe @nombre).\n\nAHORRA LLAMADAS: cada una reenv\u00EDa toda la conversaci\u00F3n.\n- Explora con treeflow_get_tree_data (una l\u00EDnea por pieza, con su ID) y pide el detalle con\n  treeflow_get_detail s\u00F3lo de lo que vayas a tocar.\n- Crea en lote: treeflow_create_intent, _create_entity y _create_leaf reciben listas (las hojas\n  nuevas se enlazan con \"ref:<ref>\").\n- Al editar manda s\u00F3lo lo que cambia: el resto se conserva. Una lista que mandes se sustituye\n  entera; para a\u00F1adir o quitar frases o valores usa add_/remove_.\n\nREENTRENA despu\u00E9s de tocar intenciones o entidades, una vez al final: treeflow_trigger_training\nespera y dice si qued\u00F3 listo. Sin reentrenar, los cambios no surten efecto y nada avisa.\n\nTEXTOS CON HUECOS: {$variable}. La sintaxis {{ }} ya no existe e imprime otra cosa.\nGu\u00EDa de referencia (plantillas, APIs, scripts, hojas, capturas, suites): treeflow_guide.\n\nEl workspace sale de la API key: no lo pidas. Los secretos salen como ***; devolverlos as\u00ED no\nlos pisa. Antes de cambios grandes, treeflow_create_backup. treeflow_delete y\ntreeflow_restore_snapshot son irreversibles: conf\u00EDrmalos con el usuario. Los bots y los usuarios\nno se borran desde aqu\u00ED, y la mesa de ayuda es de s\u00F3lo lectura: eso se hace en el panel.";
+export declare const TOOLSETS: Record<string, {
+    label: string;
+    match: RegExp;
+}>;
+export declare const DEFAULT_TOOLSETS: string[];
+export declare function toolsetOf(toolName: string): string;
+/**
+ * Grupos activos según TREEFLOW_TOOLSETS. Vacía: la base y los de por defecto. Una lista
+ * ("apis,pruebas") sustituye a los de por defecto; "todo" los activa todos.
+ */
+export declare function parseToolsets(value: string | undefined): {
+    active: Set<string>;
+    unknown: string[];
+};
+export declare function buildInstructions(active: Set<string>): string;
+/** Las instrucciones con todos los grupos activos: sirve para medirlas y probarlas. */
+export declare const INSTRUCTIONS: string;
+/**
+ * La herramienta que activa grupos a mitad de una conversación. Sólo existe mientras quede
+ * alguno inactivo; `onChange` avisa al cliente para que recargue la lista.
+ */
+export declare function enableToolsTool(active: Set<string>, allTools: ToolDef[], onChange: () => Promise<void>): ToolDef | undefined;
 export declare function buildToolGroups(client: TreeflowClient): Record<string, ToolDef[]>;
 export declare function buildTools(client: TreeflowClient): ToolDef[];

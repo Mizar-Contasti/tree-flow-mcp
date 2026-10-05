@@ -3,52 +3,56 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import { TreeflowClient } from './client/treeflowClient.js';
-import { buildTools, INSTRUCTIONS } from './catalog.js';
+import { TOOLSETS, buildInstructions, buildTools, enableToolsTool, parseToolsets, toolsetOf } from './catalog.js';
 async function main() {
     const client = new TreeflowClient();
+    // Grupos activos: la base siempre, más los de TREEFLOW_TOOLSETS (o los de por defecto).
+    const { active, unknown } = parseToolsets(process.env.TREEFLOW_TOOLSETS);
+    if (unknown.length) {
+        console.error(`TREEFLOW_TOOLSETS: no existen los grupos ${unknown.join(', ')}. Hay: ${Object.keys(TOOLSETS).join(', ')}, todo.`);
+    }
     const server = new Server({
         name: 'treeflow-mcp',
         version: '1.1.0',
     }, {
         capabilities: {
-            tools: {},
+            tools: { listChanged: true },
         },
-        instructions: INSTRUCTIONS,
+        instructions: buildInstructions(active),
     });
-    // Recolectar todas las herramientas disponibles (Catálogo completo de Treeflow)
+    // Catálogo completo de Treeflow; sólo se ofrece lo de los grupos activos.
     const allTools = buildTools(client);
-    const toolsMap = new Map();
-    const toolsList = allTools.map((t) => {
-        toolsMap.set(t.name, t.handler);
-        return {
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-        };
-    });
+    const visibleTools = () => {
+        const enable = enableToolsTool(active, allTools, () => server.sendToolListChanged());
+        const list = allTools.filter((t) => active.has(toolsetOf(t.name)));
+        return enable ? [...list, enable] : list;
+    };
     // Handler para listar herramientas
     server.setRequestHandler(ListToolsRequestSchema, async () => {
         return {
-            tools: toolsList,
+            tools: visibleTools().map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })),
         };
     });
     // Handler para ejecutar herramientas
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
-        const handler = toolsMap.get(name);
-        if (!handler) {
+        const tool = visibleTools().find((t) => t.name === name);
+        if (!tool) {
+            const group = allTools.some((t) => t.name === name) ? toolsetOf(name) : undefined;
             return {
                 content: [
                     {
                         type: 'text',
-                        text: `Error: Herramienta desconocida "${name}"`,
+                        text: group
+                            ? `Error: "${name}" es del grupo ${group}, que no está activo. Actívalo con treeflow_enable_tools.`
+                            : `Error: Herramienta desconocida "${name}"`,
                     },
                 ],
                 isError: true,
             };
         }
         try {
-            return await handler(args || {});
+            return await tool.handler(args || {});
         }
         catch (error) {
             const errorMessage = error?.response?.data?.detail || error?.message || 'Error desconocido';
@@ -65,7 +69,7 @@ async function main() {
     });
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`🚀 Treeflow MCP Server running (${toolsList.length} tools registered)`);
+    console.error(`🚀 Treeflow MCP Server running (${visibleTools().length} of ${allTools.length} tools; groups: ${[...active].join(', ')})`);
 }
 main().catch((err) => {
     console.error('Fatal error running Treeflow MCP Server:', err);

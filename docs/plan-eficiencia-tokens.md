@@ -187,13 +187,29 @@ entrenamiento ningún cambio lo parece: el estado dice "updated" y `POST /train`
 tiempo real. Falta comprobar la zona horaria de la base de producción.
 
 ### Fase 5 — Catálogo más liviano
-- [ ] Grupos de herramientas (`TREEFLOW_TOOLSETS`). **Pendiente de decidir**: qué grupo
-      viene activo por defecto.
-- [ ] Juntar `create_X`/`update_X` donde repiten esquema.
-- [ ] La documentación larga pasa a una herramienta de ayuda que se consulta cuando hace
-      falta.
+- [x] Juntar `create_X`/`update_X` donde repetían esquema (36% del catálogo): `save_tool`,
+      `save_script`, `save_capture`, `save_transfer`, `save_message_template` y
+      `save_test_suite` crean sin ID y modifican con ID.
+- [x] Los diez `delete_*` pasan a un solo `treeflow_delete(tree_id, tipo, ref)`.
+- [x] La documentación larga pasa a `treeflow_guide(tema)`: plantillas, apis, scripts,
+      hojas, capturas, suites. Las instrucciones bajan de 3,967 a ~1,700 caracteres.
+- [x] Grupos de herramientas. Decidido por Mizar: por defecto, la **base** (27) más
+      **capturas** y **respaldos**. Opcionales: apis, pruebas, atencion, historial, admin.
+      Se eligen con `TREEFLOW_TOOLSETS` ("apis,pruebas" sustituye a los de por defecto;
+      "todo" los carga todos) o, a mitad de una conversación, con `treeflow_enable_tools`,
+      que avisa al cliente con `tools/list_changed`. Las instrucciones sólo nombran
+      herramientas de los grupos activos.
 
-Listo cuando: el catálogo por defecto ronda los 5,000 tokens.
+Por llamada, por defecto: 36 herramientas, ~7,100 tokens entre catálogo e instrucciones
+(1.1.0: ~14,650). Con todo activo: 67 herramientas, ~12,400. El objetivo de ~5,000 era
+para la base sola, que pesa ~5,100; capturas y respaldos se añadieron a propósito.
+
+Hallazgo fuera de este plan: `save_message_template` crea los bloques de texto como
+`{type: "text", text}`, pero las plantillas guardadas los tienen como `{type, value}`, y
+los formateadores del backend (`core/utils/native_rich_messages.py`) leen bloques
+`{type, items}`. El backend guarda `responses` tal cual llega. La descripción ya no
+documenta un formato de bloques: remite a copiar el de una plantilla existente. Falta
+comprobar cómo se ve en un canal una plantilla creada por el MCP.
 
 ### Fase 6 — Cierre
 - [ ] README con los cambios de nombres y de comportamiento.
@@ -211,5 +227,5 @@ Listo cuando: el catálogo por defecto ronda los 5,000 tokens.
 | 2 | hecha | `scripts/e2e-dev.mjs` pasa contra dev: editar una clave conserva las demás en hojas, intenciones, entidades y canales |
 | 3 | hecha | Escrituras de 350–850 a 90–230 car.; `simulate_message` 2,024 → 490; `list_trees` 3,691 → 444 |
 | 4 | hecha | Un flujo de 3 hojas enlazadas en 1 llamada; entrenar en 1 llamada en vez de 1 + N consultas |
-| 5 | pendiente | |
+| 5 | hecha | Por llamada: ~14,650 → ~7,100 tokens (36 de 67 herramientas por defecto) |
 | 6 | pendiente | |
