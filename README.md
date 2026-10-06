@@ -60,42 +60,43 @@ Cada vez que el modelo llama a una herramienta, el cliente le vuelve a mandar **
 catálogo de herramientas, las instrucciones y la conversación entera con cada resultado
 anterior. Por eso este MCP:
 
-- **Resume primero y da el detalle aparte.** `treeflow_get_tree_data` devuelve el esquema
-  del bot en texto (una línea por hoja, intención o entidad, con su ID) y
-  `treeflow_get_detail` da el detalle completo de una sola pieza.
+- **Resume primero y da el detalle aparte.** `treeflow_get_tree_data` devuelve el bot en
+  texto, por secciones (una línea por hoja, intención o entidad), y `treeflow_get_detail` da
+  el detalle completo de una sola pieza.
+- **IDs cortos y bots por nombre.** Los IDs salen con 8 caracteres y se aceptan así de
+  vuelta; `tree_id` acepta también el nombre del bot.
 - **Edita mandando sólo lo que cambia**, sin obligar a leer antes: el `config` de una hoja
-  se combina por claves, y las frases y valores se añaden o quitan con `add_` / `remove_`.
-- **Crea en lote**: varias intenciones, entidades u hojas enlazadas en una llamada.
-- **Responde corto**: las escrituras devuelven una línea con el ID; el entrenamiento espera
-  y devuelve el resultado final.
+  se combina por claves, y frases, valores y rutas se añaden o quitan con `add_` / `remove_`.
+- **Crea en lote**: varias intenciones, entidades u hojas enlazadas en una llamada, y las
+  hojas nuevas se conectan desde una existente en la misma llamada.
+- **Responde corto**: las escrituras devuelven una línea con el ID; el entrenamiento espera,
+  y con `probar` entrena y prueba en una llamada.
 - **Carga sólo los grupos de herramientas que hacen falta.**
 
-Medido sobre un bot de 148 hojas y 101 intenciones (detalle en
-[`docs/plan-eficiencia-tokens.md`](docs/plan-eficiencia-tokens.md)):
+Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
+(`scripts/sesion-real.mjs`; detalle en [`docs/plan-eficiencia-tokens.md`](docs/plan-eficiencia-tokens.md)):
 
-| | 1.1.0 | 1.2.0 |
-|---|---|---|
-| Catálogo e instrucciones, en cada llamada | ~14,650 tokens | ~7,100 tokens |
-| `treeflow_get_tree_data` | 426,573 caracteres | 41,347 caracteres |
-| `treeflow_export_tree` | 14.6 M caracteres en la conversación | una ruta a un archivo |
-| `treeflow_simulate_message` | 2,024 caracteres | 490 caracteres |
+| Tarea | 1.1.0 | 1.2.0 | 1.3.0 |
+|---|---|---|---|
+| Explorar un bot de 148 hojas | 281,059 tokens · 8 llamadas · **no la resolvía** | 101,723 · 4 | **51,329 · 3** |
+| Construir y probar una opción | 494,392 tokens · 10 llamadas | 154,268 · 7 | **58,096 · 4** |
 
 ### Grupos de herramientas
 
 | Grupo | Por defecto | Qué trae |
 |---|---|---|
-| **base** | siempre | bots, ramas, hojas, intenciones, entidades, plantillas, detalle, borrar, guía, entrenar, simular y conversaciones |
+| **base** | siempre | bots, ramas, hojas, intenciones, entidades, plantillas, detalle, borrar, guía, entrenar y simular |
 | **capturas** | sí | las preguntas reutilizables del slot filling |
 | **respaldos** | sí | snapshots, restaurar, exportar e importar |
 | apis | no | las APIs y scripts que el bot ejecuta, sus pruebas y sus logs |
 | pruebas | no | suites de prueba y sus ejecuciones |
 | atencion | no | transferencia a humano y mesa de ayuda (sólo lectura) |
-| historial | no | historial de cambios y de entrenamientos, y analíticas |
-| admin | no | canales, voz, usuarios y credenciales |
+| historial | no | conversaciones reales, historial de cambios y de entrenamientos, y analíticas |
+| admin | no | configuración del bot (umbrales, NLP), canales, voz, usuarios y credenciales |
 
 - `"TREEFLOW_TOOLSETS": "apis,pruebas"` carga la base más esos grupos (sustituye a los de
   por defecto: si los quieres también, nómbralos).
-- `"TREEFLOW_TOOLSETS": "todo"` carga las 67 herramientas.
+- `"TREEFLOW_TOOLSETS": "todo"` carga las 62 herramientas.
 - A mitad de una conversación, el modelo puede activar un grupo con
   `treeflow_enable_tools`. El servidor avisa al cliente (`tools/list_changed`); si tu
   cliente no recarga la lista, añade el grupo a la variable y reinícialo.
@@ -105,17 +106,17 @@ Medido sobre un bot de 148 hojas y 101 intenciones (detalle en
 ## 🛠️ Herramientas
 
 ### Base
-* `treeflow_list_trees` / `treeflow_get_tree` / `treeflow_create_tree` / `treeflow_update_tree`: los bots del workspace.
-* `treeflow_get_tree_data`: el esquema de todo el bot en una llamada.
+* `treeflow_list_trees` / `treeflow_create_tree`: los bots del workspace. En las demás herramientas, `tree_id` acepta el nombre del bot.
+* `treeflow_get_tree_data(secciones, rama)`: el bot por secciones (`canvas`, `ramas`, `intenciones`, `entidades`, `plantillas`); por defecto canvas e intenciones. `rama` limita el canvas a una.
 * `treeflow_get_detail(tipo, ref)`: el detalle de una hoja, intención, entidad, plantilla, API o script, por ID o nombre.
-* `treeflow_list_branches` / `treeflow_create_branch` / `treeflow_update_branch`: las ramas (flujos) del canvas. Una rama nueva trae su hoja Start.
-* `treeflow_list_leafs` / `treeflow_create_leaf` / `treeflow_update_leaf`: las hojas. `create_leaf` recibe una lista y las enlaza entre sí con `"ref:<ref>"`; `update_leaf` combina el config (una clave en `null` se borra).
-* `treeflow_list_intents` / `treeflow_create_intent` / `treeflow_update_intent`: intenciones NLU. `create_intent` recibe una lista; `update_intent` acepta `add_patterns` / `remove_patterns`.
-* `treeflow_list_entities` / `treeflow_create_entity` / `treeflow_update_entity`: entidades. Igual, con `add_values` / `remove_values`.
-* `treeflow_list_message_templates` / `treeflow_save_message_template`: plantillas de mensaje.
+* `treeflow_create_branch` / `treeflow_update_branch`: las ramas (flujos) del canvas. Una rama nueva trae su hoja Start.
+* `treeflow_create_leaf` / `treeflow_update_leaf`: las hojas. `create_leaf` recibe una lista, las enlaza entre sí con `"ref:<ref>"` y las conecta desde una hoja existente con `connect`; `update_leaf` combina el config (una clave en `null` se borra) y acepta `add_routes` / `remove_routes`.
+* `treeflow_create_intent` / `treeflow_update_intent`: intenciones NLU. `create_intent` recibe una lista; `update_intent` acepta `add_patterns` / `remove_patterns`.
+* `treeflow_create_entity` / `treeflow_update_entity`: entidades. Igual, con `add_values` / `remove_values`.
+* `treeflow_save_message_template`: plantillas de mensaje.
 * `treeflow_delete(tipo, ref)`: borra una rama, hoja, intención, entidad, plantilla, API, script, captura, transferencia o suite.
-* `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine) y consultar el estado.
-* `treeflow_simulate_message` / `treeflow_list_conversations` / `treeflow_get_conversation`: probar el bot y leer conversaciones.
+* `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine; con `probar`, prueba mensajes al terminar) y consultar el estado.
+* `treeflow_simulate_message`: probar el bot, siguiendo una conversación con su `session_id`.
 * `treeflow_guide(tema)`: referencia de plantillas, APIs, scripts, hojas, capturas y suites.
 
 ### Capturas
@@ -142,9 +143,11 @@ Medido sobre un bot de 148 hojas y 101 intenciones (detalle en
 * `treeflow_get_live_chat_queue` / `treeflow_get_live_chat_history` / `treeflow_get_live_chat_session`: la mesa de ayuda, sólo lectura.
 
 ### historial
+* `treeflow_list_conversations` / `treeflow_get_conversation`: las conversaciones reales del bot.
 * `treeflow_list_change_history` (con `change_id`, el antes/después de un cambio), `treeflow_list_training_history`, `treeflow_get_conversation_analytics`.
 
 ### admin
+* `treeflow_get_tree` / `treeflow_update_tree`: la configuración del bot (umbrales, modo NLP, orden de detección).
 * `treeflow_list_integrations` / `treeflow_configure_integration`: canales. El token de Telegram se conecta desde el panel.
 * `treeflow_get_voice_config` / `treeflow_update_voice_config`.
 * `treeflow_list_users` / `treeflow_create_user` / `treeflow_update_user` / `treeflow_list_credentials`.
@@ -152,6 +155,15 @@ Medido sobre un bot de 148 hojas y 101 intenciones (detalle en
 > El borrado de bots y de usuarios **no** se expone: son operaciones irreversibles que se hacen desde el panel de Treeflow. Tampoco se puede tomar, responder ni cerrar una atención de la mesa de ayuda.
 
 ---
+
+## 🔁 Cambios de la 1.3.0 que rompen con la 1.2.0
+
+| Antes | Ahora |
+|---|---|
+| `list_branches`, `list_leafs`, `list_intents`, `list_entities`, `list_message_templates` | `get_tree_data` con `secciones` (y `rama`) |
+| los IDs salían completos (36 caracteres) | salen con 8; los completos se siguen aceptando |
+| `get_tree` / `update_tree` en la base | en el grupo **admin** |
+| `list_conversations` / `get_conversation` en la base | en el grupo **historial** |
 
 ## 🔁 Cambios de la 1.2.0 que rompen con la 1.1.0
 
@@ -176,7 +188,14 @@ npm install
 npm test                 # compila y corre las pruebas (sin red)
 npm run medir            # cuánto pesa el catálogo; con --arbol "Nombre" mide también las lecturas
 node scripts/e2e-dev.mjs # de punta a punta contra un backend real, sobre un bot de pruebas propio
+node scripts/sesion-real.mjs --tarea explorar --etiqueta prueba   # una sesión real de Claude, medida
 ```
+
+`scripts/sesion-real.mjs` le da una tarea a Claude con el MCP conectado, por el CLI de Claude
+Code (`claude auth login` antes), y registra los tokens de cada llamada, las herramientas
+usadas y lo que devolvió cada una. Con `--mcp <carpeta>` mide otra versión y con
+`--comparar a.json b.json` pone dos corridas lado a lado. Gasta uso real de la cuenta;
+`--tope` le pone un máximo en dólares.
 
 `npm run medir -- --arbol` y `scripts/e2e-dev.mjs` leen la conexión de las variables de
 entorno o de un `.env` en la raíz del repo (está en `.gitignore`). El de punta a punta crea

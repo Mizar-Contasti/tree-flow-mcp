@@ -285,6 +285,37 @@ Hallazgo del backend: `POST /api/backup/trees/{id}/snapshots/{snapshot_id}/resto
 una API key (`'User' object has no attribute 'user_id'`), así que `treeflow_restore_snapshot`
 no funciona para quien entra por el MCP.
 
+## Fase 7 — Lo que mostraron las sesiones reales (1.3.0)
+
+- [x] **El bot por nombre**: `tree_id` acepta el nombre (o un prefijo del ID). Quita la
+      llamada de `list_trees` con la que empezaba toda sesión.
+- [x] **IDs cortos**: cada UUID sale con 8 caracteres y se recuerda en el proceso; cuando el
+      modelo lo devuelve, en un parámetro o dentro de un config, se expande. Un corto
+      desconocido en un campo de ID es un error claro. Eran un tercio del esquema.
+- [x] **`get_tree_data` por secciones** (`canvas`, `ramas`, `intenciones`, `entidades`,
+      `plantillas`; por defecto las dos primeras de uso) y por `rama`. Lo no pedido se cuenta.
+      Reemplaza a los cinco `list_*` del canvas y del NLU.
+- [x] **Rutas sueltas**: `update_leaf` con `add_routes` / `remove_routes`, y `create_leaf`
+      con `connect` para conectar las hojas nuevas desde una existente en la misma llamada.
+- [x] **Entrenar y probar** en una llamada: `trigger_training` con `probar`.
+- [x] `get_tree`/`update_tree` pasan a admin y las conversaciones reales a historial.
+
+Medido con el mismo arnés, las mismas tareas y el bot de pruebas devuelto a su estado
+inicial entre corridas:
+
+| Tarea | 1.1.0 | 1.2.0 | 1.3.0 |
+|---|---|---|---|
+| Explorar CECYTECH | 281,059 tok · 8 llamadas · $0.263 · no la resolvía | 101,723 · 4 · $0.191 | **51,329 · 3 · $0.113** |
+| Construir y probar | 494,392 tok · 10 llamadas · $0.359 | 154,268 · 7 · $0.142 | **58,096 · 4 · $0.064** |
+
+La 1.3.0 respondió igual de completo al explorar y, al construir, creó, conectó, entrenó y
+probó sin tocar lo que no debía (la hoja de inicio sólo ganó la ruta nueva). Usó IDs
+cortos en todas las llamadas sin un solo error. El esquema de CECYTECH por defecto pasó de
+23,605 a ~8,900 tokens.
+
+Lo que queda por llamada es sobre todo el catálogo (~10,800 tokens con 27 herramientas):
+con 3–4 llamadas por tarea, ya es la mitad de lo que se gasta.
+
 ## Estado
 
 | Fase | Estado | Resultado |
@@ -296,3 +327,4 @@ no funciona para quien entra por el MCP.
 | 4 | hecha | Un flujo de 3 hojas enlazadas en 1 llamada; entrenar en 1 llamada en vez de 1 + N consultas |
 | 5 | hecha | Por llamada: ~14,650 → ~7,100 tokens (36 de 67 herramientas por defecto) |
 | 6 | hecha | En `main` desde el 6-oct-2026; npx ya sirve la 1.2.0 |
+| 7 | hecha, sin subir | 1.3.0: explorar −50% y construir −62% de tokens frente a 1.2.0, medido en sesiones reales |
