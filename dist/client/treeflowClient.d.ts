@@ -1,5 +1,17 @@
 /** Combina un config por claves de primer nivel: lo enviado pisa lo guardado y null lo quita. */
 export declare function mergeConfig(current: Record<string, any>, patch: Record<string, any>): Record<string, any>;
+/** Una ruta de un trigger_context: si llega esta intención (o evento), salta a esa hoja. */
+export interface Route {
+    name: string;
+    targetLeafId: string;
+    kind?: 'intent' | 'event';
+}
+/**
+ * Añade o quita rutas de config.intents / config.events sin reescribir la lista: lo que hoy
+ * obliga al modelo a leerla entera y devolverla con un elemento más. Una ruta con el mismo
+ * nombre se redirige en vez de duplicarse. Los IDs nuevos siguen el formato del editor.
+ */
+export declare function editRoutes(config: Record<string, any>, add?: Route[], remove?: string[]): Record<string, any>;
 /** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
 export declare function editList(current: string[], add?: string[], remove?: string[]): string[];
 export interface ToolVariableInput {
@@ -102,6 +114,8 @@ export declare class TreeflowClient {
         branchId?: string;
         treeId?: string;
         replaceConfig?: boolean;
+        addRoutes?: Route[];
+        removeRoutes?: string[];
     }): Promise<any>;
     deleteLeaf(leafId: string): Promise<any>;
     listIntents(treeId: string): Promise<any>;

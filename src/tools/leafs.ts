@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { TreeflowClient } from '../client/treeflowClient.js';
+import { Route, TreeflowClient } from '../client/treeflowClient.js';
 import { canvasNames, leafLine } from './resumen.js';
 import { ok } from './util.js';
 
@@ -27,9 +27,22 @@ export function resolveRefs(value: any, ids: Map<string, string>): any {
   return value;
 }
 
+/** Conectar una hoja nueva desde una que ya existe: la ruta se añade a esa hoja. */
+export interface Connection {
+  from: string;
+  name: string;
+  to: string;
+  kind?: 'intent' | 'event';
+}
+
+const routeProps = {
+  name: { type: 'string', description: 'La intención (o evento) que dispara la ruta' },
+  kind: { type: 'string', enum: ['intent', 'event'], description: 'Default intent' },
+};
+
 // Los IDs se asignan antes de crear, así una hoja puede apuntar a otra que todavía no
 // existe y todo queda enlazado en una sola pasada, sin crear y luego corregir.
-async function createLeaves(client: TreeflowClient, branchId: string, leaves: NewLeaf[]) {
+async function createLeaves(client: TreeflowClient, branchId: string, leaves: NewLeaf[], connect: Connection[] = []) {
   if (!Array.isArray(leaves) || !leaves.length) throw new Error('Manda al menos una hoja en leaves.');
   const ids = new Map<string, string>();
   for (const [i, leaf] of leaves.entries()) {
@@ -40,6 +53,7 @@ async function createLeaves(client: TreeflowClient, branchId: string, leaves: Ne
   const refs = [...ids.keys()];
   // Todo se valida antes de crear nada: un ref roto no deja la rama a medias.
   const configs = leaves.map((leaf) => resolveRefs(leaf.config ?? {}, ids));
+  const links = connect.map((c) => ({ ...c, to: resolveRefs(c.to, ids) as string }));
 
   const created: any[] = [];
   try {
@@ -62,7 +76,28 @@ async function createLeaves(client: TreeflowClient, branchId: string, leaves: Ne
     throw new Error(`Falló la hoja ${created.length + 1} (${refs[created.length]}): ${typeof detail === 'object' ? JSON.stringify(detail) : detail}. Ya creadas: ${done}.`);
   }
   const names = canvasNames([{ leaves: created }]);
-  return [`Hojas creadas (${created.length}):`, ...created.map((l) => leafLine(l, names))].join('\n');
+  const lines = [`Hojas creadas (${created.length}):`, ...created.map((l) => leafLine(l, names))];
+
+  // Las rutas desde hojas existentes, agrupadas por hoja de origen: una escritura por cada una.
+  if (links.length) {
+    const treeId = (await client.getBranch(branchId))?.tree_id;
+    const byFrom = new Map<string, Connection[]>();
+    for (const l of links) byFrom.set(l.from, [...(byFrom.get(l.from) ?? []), l]);
+    lines.push('Conectadas desde:');
+    for (const [from, list] of byFrom) {
+      try {
+        const updated = await client.updateLeaf(from, {}, {
+          treeId,
+          addRoutes: list.map((l) => ({ name: l.name, targetLeafId: l.to, kind: l.kind })),
+        });
+        lines.push(`- ${updated.name} [${updated.id}]: ${list.map((l) => `${l.name}→${names.leaves.get(l.to) ?? l.to}`).join(', ')}`);
+      } catch (e: any) {
+        const detail = e?.response?.data?.detail ?? e?.message ?? e;
+        lines.push(`- ✘ ${from}: no se pudo conectar (${typeof detail === 'object' ? JSON.stringify(detail) : detail}). Las hojas sí se crearon.`);
+      }
+    }
+  }
+  return lines.join('\n');
 }
 
 export function registerLeafTools(client: TreeflowClient) {
@@ -71,8 +106,9 @@ export function registerLeafTools(client: TreeflowClient) {
       name: 'treeflow_create_leaf',
       description:
         'Crea una o varias hojas en una rama, en una sola llamada. Enlázalas entre sí escribiendo "ref:<ref>" en ' +
-        'cualquier valor del config (nextLeafId, targetLeafId…): se sustituye por el ID. Tipos y claves del config: ' +
-        'treeflow_guide("hojas"). Sin posición, se colocan en fila.',
+        'cualquier valor del config (nextLeafId, targetLeafId…): se sustituye por el ID. connect las conecta desde ' +
+        'hojas que ya existen (ej. el Start), en la misma llamada. Tipos y claves del config: treeflow_guide("hojas"). ' +
+        'Sin posición, se colocan en fila.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -94,16 +130,31 @@ export function registerLeafTools(client: TreeflowClient) {
               required: ['leaf_type'],
             },
           },
+          connect: {
+            type: 'array',
+            description: 'Rutas a añadir en hojas existentes hacia las nuevas',
+            items: {
+              type: 'object',
+              properties: {
+                from: { type: 'string', description: 'ID de la hoja existente (un trigger_context)' },
+                ...routeProps,
+                to: { type: 'string', description: '"ref:<ref>" de una hoja nueva, o un ID' },
+              },
+              required: ['from', 'name', 'to'],
+            },
+          },
         },
         required: ['branch_id', 'leaves'],
       },
-      handler: async (args: { branch_id: string; leaves: NewLeaf[] }) => ok(await createLeaves(client, args.branch_id, args.leaves)),
+      handler: async (args: { branch_id: string; leaves: NewLeaf[]; connect?: Connection[] }) =>
+        ok(await createLeaves(client, args.branch_id, args.leaves, args.connect)),
     },
     {
       name: 'treeflow_update_leaf',
       description:
         'Actualiza una hoja. config se combina con el guardado: manda sólo las claves que cambian (null borra una); ' +
-        'las listas (intents, events) se sustituyen completas. Hace falta branch_id o tree_id para leer el guardado.',
+        'las listas (intents, events) se sustituyen completas. Para añadir o quitar UNA ruta de un trigger_context ' +
+        'usa add_routes / remove_routes: no hace falta leer ni reenviar la lista. Hace falta branch_id o tree_id.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -114,6 +165,11 @@ export function registerLeafTools(client: TreeflowClient) {
           leaf_type: { type: 'string', description: 'Nuevo tipo de nodo' },
           config: { type: 'object', description: 'Claves del config que cambian' },
           replace_config: { type: 'boolean', description: 'true sustituye el config entero por el que mandas' },
+          add_routes: {
+            type: 'array',
+            items: { type: 'object', properties: { ...routeProps, targetLeafId: { type: 'string' } }, required: ['name', 'targetLeafId'] },
+          },
+          remove_routes: { type: 'array', items: { type: 'string' }, description: 'Nombres de las rutas a quitar' },
           position_x: { type: 'number', description: 'Nueva posición X en el lienzo' },
           position_y: { type: 'number', description: 'Nueva posición Y en el lienzo' },
           is_start: { type: 'boolean', description: 'Marca el nodo como inicio de la rama' },
@@ -128,6 +184,8 @@ export function registerLeafTools(client: TreeflowClient) {
         leaf_type?: string;
         config?: any;
         replace_config?: boolean;
+        add_routes?: Route[];
+        remove_routes?: string[];
         position_x?: number;
         position_y?: number;
         is_start?: boolean;
@@ -142,7 +200,13 @@ export function registerLeafTools(client: TreeflowClient) {
             position_y: args.position_y,
             is_start: args.is_start,
           },
-          { branchId: args.branch_id, treeId: args.tree_id, replaceConfig: args.replace_config }
+          {
+            branchId: args.branch_id,
+            treeId: args.tree_id,
+            replaceConfig: args.replace_config,
+            addRoutes: args.add_routes,
+            removeRoutes: args.remove_routes,
+          }
         );
         return ok(`Hoja actualizada: ${leafLine(result, canvasNames([]))}`);
       },

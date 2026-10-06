@@ -17,6 +17,9 @@ process.chdir(ROOT);
 const dist = (p) => import(pathToFileURL(path.join(ROOT, 'dist', p)).href);
 const { TreeflowClient } = await dist('client/treeflowClient.js');
 const { buildTools } = await dist('catalog.js');
+const { shortenText } = await dist('ids.js');
+// Lo leído directo del cliente lleva UUID completos; lo que devuelven las herramientas, cortos.
+const comoHerramienta = (v) => JSON.parse(shortenText(JSON.stringify(v)));
 
 const BOT = 'MCP pruebas (Claude)';
 const client = new TreeflowClient();
@@ -35,8 +38,9 @@ const T = tree.tree_id;
 console.log(`Bot de pruebas: ${T}`);
 
 // Restos de una corrida anterior que falló a medias
-for (const b of await client.listBranches(T)) if (b.name.startsWith('Rama e2e ')) await client.deleteBranch(b.id);
-for (const s of await client.listTestSuites(T)) if (s.name.startsWith('Suite e2e ')) await client.deleteTestSuite(s.id);
+// (el backend guarda los nombres con guiones bajos en vez de espacios)
+for (const b of await client.listBranches(T)) if (/^Rama[ _]e2e[ _]/.test(b.name)) await client.deleteBranch(b.id);
+for (const s of await client.listTestSuites(T)) if (/^Suite[ _]e2e[ _]/.test(s.name)) await client.deleteTestSuite(s.id);
 for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
 for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
 
@@ -75,7 +79,7 @@ assert.equal(now.patterns.length, intent.patterns.length + 1);
 await call('update_intent', { tree_id: T, intent_id: intent.id, remove_patterns: [frase] });
 now = await json('get_detail', { tree_id: T, tipo: 'intent', ref: intent.id });
 assert.deepEqual(now.patterns, intent.patterns);
-assert.deepEqual(now.entities ?? [], intent.entities ?? []);
+assert.deepEqual(now.entities ?? [], comoHerramienta(intent.entities ?? []));
 step(`update_intent añadió y quitó una frase de "${intent.name}" sin tocar las otras ${intent.patterns.length}`);
 
 // ── update_entity: add/remove ──
@@ -191,9 +195,42 @@ step(`trigger_training esperó hasta el final (${entrenado.match(/en (\d+) s/)[1
 // Limpieza: el bot de pruebas queda como estaba
 for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
 for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
-await client.deleteBranch(flowBranch);
+await call('delete', { tree_id: T, tipo: 'branch', ref: flowBranch }); // ID corto: por la herramienta
 await client.trainAndWait(T, { force: true });
 step('limpieza: intenciones, entidad y rama de prueba borradas, y el bot reentrenado');
+
+// ── Fase 7: el bot por nombre, IDs cortos, conectar al crear, entrenar y probar ──
+const esquema = await measured('get_tree_data', { tree_id: BOT });
+assert.ok(!/[0-9a-f]{8}-[0-9a-f]{4}-/.test(esquema), 'el esquema no debe llevar UUID completos');
+const inicio = esquema.match(/- (.+?) \(trigger_context, inicio\) \[([0-9a-f]{8,12})\]/);
+assert.ok(inicio, 'el esquema debe mostrar la hoja de inicio con su ID corto');
+// La rama de la hoja de inicio: la última "Rama" que aparece antes de su línea.
+const branchOfStart = esquema.split('\n').reduce((acc, line) => {
+  const b = line.match(/^Rama "[^"]+" \[([0-9a-f]{8,12})\]/);
+  if (b) acc.current = b[1];
+  if (line.includes(`[${inicio[2]}]`) && !acc.found) acc.found = acc.current;
+  return acc;
+}, { current: null, found: null }).found;
+const conectada = await measured('create_leaf', {
+  branch_id: branchOfStart,
+  leaves: [{ ref: 'h', leaf_type: 'intent', name: 'Horario e2e', config: { intentName: `e2e_horario_${stamp}`, isCustomResponse: true, messageText: 'De 9 a 18 h' } }],
+  connect: [{ from: inicio[2], name: `e2e_horario_${stamp}`, to: 'ref:h' }],
+});
+assert.match(conectada, /Conectadas desde:\n- .+: e2e_horario_\d+→Horario_e2e/);
+const nuevaHoja = conectada.match(/- Horario_e2e \(intent\) \[([0-9a-f]{8,12})\]/)[1];
+let inicioAhora = await json('get_detail', { tree_id: BOT, tipo: 'leaf', ref: inicio[2] });
+assert.ok(inicioAhora.config.intents.some((r) => r.name === `e2e_horario_${stamp}` && r.targetLeafId === nuevaHoja), 'la ruta nueva apunta a la hoja nueva');
+step('el bot por nombre, IDs cortos de ida y vuelta, y create_leaf creó y conectó la hoja desde el inicio en una llamada');
+
+await call('update_leaf', { leaf_id: inicio[2], branch_id: branchOfStart, remove_routes: [`e2e_horario_${stamp}`] });
+inicioAhora = await json('get_detail', { tree_id: BOT, tipo: 'leaf', ref: inicio[2] });
+assert.ok(!inicioAhora.config.intents.some((r) => r.name === `e2e_horario_${stamp}`));
+step('update_leaf con remove_routes quitó sólo esa ruta');
+await call('delete', { tree_id: BOT, tipo: 'leaf', ref: nuevaHoja });
+
+const probado = await measured('trigger_training', { tree_id: BOT, probar: ['hola', 'a qué hora abren'] });
+assert.match(probado, /^Entrenamiento terminado .*\nPruebas \(cada una en una conversación nueva\):\n- "hola" → intención \S+/);
+step('trigger_training entrenó y probó dos mensajes en una llamada');
 
 console.log('\nTamaño de las respuestas (caracteres):');
 for (const [k, v] of Object.entries(sizes)) console.log(`  ${k.padEnd(20)} ${v}`);

@@ -21,6 +21,37 @@ export function mergeConfig(current: Record<string, any>, patch: Record<string, 
   return out;
 }
 
+/** Una ruta de un trigger_context: si llega esta intención (o evento), salta a esa hoja. */
+export interface Route {
+  name: string;
+  targetLeafId: string;
+  kind?: 'intent' | 'event';
+}
+
+/**
+ * Añade o quita rutas de config.intents / config.events sin reescribir la lista: lo que hoy
+ * obliga al modelo a leerla entera y devolverla con un elemento más. Una ruta con el mismo
+ * nombre se redirige en vez de duplicarse. Los IDs nuevos siguen el formato del editor.
+ */
+export function editRoutes(config: Record<string, any>, add: Route[] = [], remove: string[] = []) {
+  const out: Record<string, any> = { ...config };
+  const drop = new Set(remove.map((n) => n.trim().toLowerCase()));
+  for (const key of ['intents', 'events']) {
+    if (drop.size && Array.isArray(out[key])) out[key] = out[key].filter((r: any) => !drop.has(String(r?.name ?? '').trim().toLowerCase()));
+  }
+  const stamp = Date.now();
+  add.forEach((r, i) => {
+    const key = r.kind === 'event' ? 'events' : 'intents';
+    const list: any[] = Array.isArray(out[key]) ? out[key].map((x: any) => ({ ...x })) : [];
+    const same = list.find((x) => x?.name === r.name);
+    if (same) same.targetLeafId = r.targetLeafId;
+    else if (key === 'events') list.push({ id: `conn_${stamp}${i}`, name: r.name, type: 'custom', targetLeafId: r.targetLeafId });
+    else list.push({ id: `intent_${stamp}${i}`, name: r.name, targetLeafId: r.targetLeafId });
+    out[key] = list;
+  });
+  return out;
+}
+
 /** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
 export function editList(current: string[], add: string[] = [], remove: string[] = []) {
   const drop = new Set(remove.map((s) => s.trim()));
@@ -288,21 +319,23 @@ export class TreeflowClient {
   async updateLeaf(
     leafId: string,
     data: { name?: string; type?: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean },
-    options: { branchId?: string; treeId?: string; replaceConfig?: boolean } = {}
+    options: { branchId?: string; treeId?: string; replaceConfig?: boolean; addRoutes?: Route[]; removeRoutes?: string[] } = {}
   ) {
     const body: Record<string, any> = {};
     for (const key of ['name', 'type', 'position_x', 'position_y', 'config', 'is_start'] as const) {
       if (data[key] !== undefined) body[key] = data[key];
     }
-    if (body.config !== undefined && !options.replaceConfig) {
+    const routes = Boolean(options.addRoutes?.length || options.removeRoutes?.length);
+    if ((body.config !== undefined && !options.replaceConfig) || routes) {
       if (!options.branchId && !options.treeId) {
         throw new Error(
-          'Para cambiar config sin borrar lo demás hace falta branch_id o tree_id (para leer el config guardado). ' +
-          'Si de verdad quieres sustituirlo entero, manda replace_config: true.'
+          'Para cambiar config o rutas sin borrar lo demás hace falta branch_id o tree_id (para leer el config ' +
+          'guardado). Si de verdad quieres sustituirlo entero, manda replace_config: true.'
         );
       }
       const current = await this.findLeaf(leafId, options);
-      body.config = mergeConfig(current.config ?? {}, body.config);
+      const base = options.replaceConfig ? body.config ?? {} : mergeConfig(current.config ?? {}, body.config ?? {});
+      body.config = routes ? editRoutes(base, options.addRoutes, options.removeRoutes) : base;
     }
     const response = await this.client.put(`/design/leaves/${leafId}`, body);
     return response.data;

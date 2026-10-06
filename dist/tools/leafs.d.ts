@@ -1,4 +1,4 @@
-import { TreeflowClient } from '../client/treeflowClient.js';
+import { Route, TreeflowClient } from '../client/treeflowClient.js';
 export interface NewLeaf {
     ref?: string;
     leaf_type: string;
@@ -10,6 +10,13 @@ export interface NewLeaf {
 }
 /** Sustituye cada "ref:<ref>" del valor (a cualquier profundidad) por el ID asignado. */
 export declare function resolveRefs(value: any, ids: Map<string, string>): any;
+/** Conectar una hoja nueva desde una que ya existe: la ruta se añade a esa hoja. */
+export interface Connection {
+    from: string;
+    name: string;
+    to: string;
+    kind?: 'intent' | 'event';
+}
 export declare function registerLeafTools(client: TreeflowClient): ({
     name: string;
     description: string;
@@ -55,12 +62,41 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                     required: string[];
                 };
             };
+            connect: {
+                type: string;
+                description: string;
+                items: {
+                    type: string;
+                    properties: {
+                        to: {
+                            type: string;
+                            description: string;
+                        };
+                        name: {
+                            type: string;
+                            description: string;
+                        };
+                        kind: {
+                            type: string;
+                            enum: string[];
+                            description: string;
+                        };
+                        from: {
+                            type: string;
+                            description: string;
+                        };
+                    };
+                    required: string[];
+                };
+            };
             leaf_id?: undefined;
             tree_id?: undefined;
             name?: undefined;
             leaf_type?: undefined;
             config?: undefined;
             replace_config?: undefined;
+            add_routes?: undefined;
+            remove_routes?: undefined;
             position_x?: undefined;
             position_y?: undefined;
             is_start?: undefined;
@@ -70,6 +106,7 @@ export declare function registerLeafTools(client: TreeflowClient): ({
     handler: (args: {
         branch_id: string;
         leaves: NewLeaf[];
+        connect?: Connection[];
     }) => Promise<{
         content: {
             type: string;
@@ -110,6 +147,34 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            add_routes: {
+                type: string;
+                items: {
+                    type: string;
+                    properties: {
+                        targetLeafId: {
+                            type: string;
+                        };
+                        name: {
+                            type: string;
+                            description: string;
+                        };
+                        kind: {
+                            type: string;
+                            enum: string[];
+                            description: string;
+                        };
+                    };
+                    required: string[];
+                };
+            };
+            remove_routes: {
+                type: string;
+                items: {
+                    type: string;
+                };
+                description: string;
+            };
             position_x: {
                 type: string;
                 description: string;
@@ -123,6 +188,7 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 description: string;
             };
             leaves?: undefined;
+            connect?: undefined;
         };
         required: string[];
     };
@@ -134,6 +200,8 @@ export declare function registerLeafTools(client: TreeflowClient): ({
         leaf_type?: string;
         config?: any;
         replace_config?: boolean;
+        add_routes?: Route[];
+        remove_routes?: string[];
         position_x?: number;
         position_y?: number;
         is_start?: boolean;

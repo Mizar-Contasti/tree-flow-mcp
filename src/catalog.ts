@@ -85,15 +85,18 @@ nueva trae su hoja Start) y el NLU (intenciones con frases de entrenamiento, ent
 valores y sinónimos; en las frases, una entidad se escribe @nombre).
 
 AHORRA LLAMADAS: cada una reenvía toda la conversación.
-- Explora con treeflow_get_tree_data (una línea por pieza, con su ID) y pide el detalle con
-  treeflow_get_detail sólo de lo que vayas a tocar.
-- Crea en lote: treeflow_create_intent, _create_entity y _create_leaf reciben listas (las hojas
-  nuevas se enlazan con "ref:<ref>").
+- tree_id acepta el nombre del bot: no listes los bots sólo para buscar su ID. Los IDs salen
+  cortos (8 caracteres): úsalos tal cual.
+- Explora con treeflow_get_tree_data (por defecto canvas e intenciones; pide otras secciones o
+  una sola rama si hace falta) y el detalle con treeflow_get_detail, sólo de lo que vayas a tocar.
+- Crea en lote: treeflow_create_intent, _create_entity y _create_leaf reciben listas. Las hojas
+  nuevas se enlazan con "ref:<ref>", y create_leaf las conecta desde una existente (connect).
 - Al editar manda sólo lo que cambia: el resto se conserva. Una lista que mandes se sustituye
-  entera; para añadir o quitar frases o valores usa add_/remove_.
+  entera; para añadir o quitar frases, valores o rutas usa add_/remove_.
 
 REENTRENA después de tocar intenciones o entidades, una vez al final: treeflow_trigger_training
-espera y dice si quedó listo. Sin reentrenar, los cambios no surten efecto y nada avisa.
+espera, dice si quedó listo y, con probar, prueba mensajes en la misma llamada. Sin reentrenar,
+los cambios no surten efecto y nada avisa.
 
 TEXTOS CON HUECOS: {$variable}. La sintaxis {{ }} ya no existe e imprime otra cosa.
 Guía de referencia (plantillas, APIs, scripts, hojas, capturas, suites): treeflow_guide.

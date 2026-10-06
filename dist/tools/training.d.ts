@@ -9,6 +9,13 @@ export declare function registerTrainingTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            probar: {
+                type: string;
+                items: {
+                    type: string;
+                };
+                description: string;
+            };
             force: {
                 type: string;
                 description: string;
@@ -22,6 +29,7 @@ export declare function registerTrainingTools(client: TreeflowClient): ({
     };
     handler: (args: {
         tree_id: string;
+        probar?: string[];
         force?: boolean;
         esperar_segundos?: number;
     }) => Promise<{
@@ -40,6 +48,7 @@ export declare function registerTrainingTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            probar?: undefined;
             force?: undefined;
             esperar_segundos?: undefined;
         };

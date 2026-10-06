@@ -13,7 +13,7 @@ export declare function registerDeleteTools(client: TreeflowClient): {
             };
             tipo: {
                 type: string;
-                enum: ("entity" | "tool" | "intent" | "branch" | "leaf" | "template" | "script" | "capture" | "transfer" | "test_suite")[];
+                enum: ("intent" | "entity" | "tool" | "branch" | "leaf" | "template" | "script" | "capture" | "transfer" | "test_suite")[];
             };
             ref: {
                 type: string;

@@ -50,11 +50,13 @@ Tipos y claves de config habituales:
   trigger_context: un punto de espera que escucha intenciones y eventos y salta a otra hoja.
     intents: [{ name, targetLeafId }], events: [{ name, targetLeafId }], contextName.
   event: responde a un evento como sys.no-match. eventName, messageText, nextLeafId.
-Una rama nueva trae su hoja Start (trigger_context): conéctala a tus hojas con update_leaf.
+Una rama nueva trae su hoja Start (trigger_context).
 Para que el motor detecte una intención, alguna hoja trigger_context alcanzable debe escucharla.
-Al crear varias, enlázalas con "ref:<ref>" en cualquier valor del config (nextLeafId, targetLeafId).
+Al crear varias, enlázalas con "ref:<ref>" en cualquier valor del config (nextLeafId, targetLeafId),
+  y conéctalas desde una hoja existente con connect: [{ from, name, to: "ref:<ref>" }].
 update_leaf combina el config por claves: manda sólo las que cambian; una en null se borra; las
-  listas (intents, events) se sustituyen completas. Hace falta branch_id o tree_id.
+  listas (intents, events) se sustituyen completas. Una ruta suelta: add_routes / remove_routes.
+  Hace falta branch_id o tree_id.
 Antes de editar una hoja existente, mira su config con treeflow_get_detail(tipo leaf).`,
 
   capturas: `CAPTURAS (treeflow_save_capture)

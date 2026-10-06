@@ -13,7 +13,7 @@ export declare function registerDetailTools(client: TreeflowClient): {
             };
             tipo: {
                 type: string;
-                enum: ("entity" | "tool" | "intent" | "leaf" | "template" | "script")[];
+                enum: ("intent" | "entity" | "tool" | "leaf" | "template" | "script")[];
             };
             ref: {
                 type: string;

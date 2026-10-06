@@ -38,6 +38,8 @@ export declare const scriptLine: (s: any) => string;
 export declare function fertilizersSummary(config: any): string;
 /** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
 export declare function simulationSummary(r: any): string;
+/** Una prueba en una línea: lo que se mandó, qué intención ganó, dónde quedó y qué dijo. */
+export declare function testLine(message: string, r: any): string;
 export declare function conversationsList(convs: any[]): string;
 export declare function conversationSummary(conv: any): string;
 export declare function suiteLine(suite: any): string;

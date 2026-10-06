@@ -1,15 +1,17 @@
-import { clip } from './resumen.js';
+import { clip, testLine } from './resumen.js';
 import { ok } from './util.js';
 export function registerTrainingTools(client) {
     return [
         {
             name: 'treeflow_trigger_training',
             description: 'Reentrena el modelo NLU del bot con sus intenciones y entidades actuales y ESPERA a que termine: devuelve el ' +
-                'resultado final (si quedó listo para usarse o el error). No hace falta consultar el estado después.',
+                'resultado final (si quedó listo para usarse o el error). Con probar, al terminar manda esos mensajes al bot ' +
+                '(cada uno en una conversación nueva) y dice qué intención ganó y qué contestó: entrenar y probar en una llamada.',
             inputSchema: {
                 type: 'object',
                 properties: {
-                    tree_id: { type: 'string', description: 'ID del bot/árbol a entrenar' },
+                    tree_id: { type: 'string', description: 'ID o nombre del bot' },
+                    probar: { type: 'array', items: { type: 'string' }, description: 'Mensajes de prueba tras entrenar' },
                     force: { type: 'boolean', description: 'Default true. Con false, el backend no entrena si cree que no hubo cambios' },
                     esperar_segundos: { type: 'integer', description: 'Máximo a esperar (default 90)' },
                 },
@@ -37,7 +39,20 @@ export function registerTrainingTools(client) {
                     parts.push(`${summary.intents_total} intenciones, ${summary.entities_total ?? '?'} entidades`);
                 if (r.last?.error_message)
                     parts.push(`error${r.last.error_phase ? ` en ${r.last.error_phase}` : ''}: ${clip(r.last.error_message, 200)}`);
-                return ok(parts.join(' · '));
+                const lines = [parts.join(' · ')];
+                // Probar sólo tiene sentido con un modelo listo.
+                if (args.probar?.length && s.can_use) {
+                    lines.push('Pruebas (cada una en una conversación nueva):');
+                    for (const message of args.probar) {
+                        try {
+                            lines.push(testLine(message, await client.simulateChatMessage(args.tree_id, message)));
+                        }
+                        catch (e) {
+                            lines.push(`- "${clip(message, 60)}" → error: ${clip(e?.response?.data?.detail ?? e?.message ?? e, 120)}`);
+                        }
+                    }
+                }
+                return ok(lines.join('\n'));
             },
         },
         {

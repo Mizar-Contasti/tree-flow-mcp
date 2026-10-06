@@ -248,6 +248,15 @@ export function simulationSummary(r) {
         lines.push(`session_id: ${r.session_id} (mándalo en el siguiente mensaje para seguir esta conversación)`);
     return lines.join('\n');
 }
+/** Una prueba en una línea: lo que se mandó, qué intención ganó, dónde quedó y qué dijo. */
+export function testLine(message, r) {
+    const why = [r?.intent ? `intención ${r.intent}` : 'sin intención'];
+    if (typeof r?.confidence === 'number')
+        why[0] += ` (${r.confidence.toFixed(2)})`;
+    if (r?.state?.current_node)
+        why.push(`hoja ${r.state.current_node}`);
+    return `- "${clip(message, 60)}" → ${why.join(' · ')} · ${botSaid(r, 100)}`;
+}
 export function conversationsList(convs) {
     return [
         `Conversaciones (${convs.length}):`,
