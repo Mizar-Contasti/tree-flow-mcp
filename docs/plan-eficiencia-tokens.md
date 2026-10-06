@@ -216,8 +216,8 @@ comprobar cómo se ve en un canal una plantilla creada por el MCP.
 - [x] Versión 1.2.0; el servidor la lee del `package.json`.
 - [x] Medición final contra la línea base y prueba completa en dev: 59 pruebas, 76 rutas
       válidas, 13 comprobaciones de punta a punta contra el backend real.
-- [ ] Push a `main`, **sólo con el visto bueno de Mizar**: cambia el MCP de dev y de prod
-      en el siguiente reinicio de Claude Desktop.
+- [x] Push a `main` con el visto bueno de Mizar (6-oct-2026). Comprobado que
+      `npx -y github:Mizar-Contasti/tree-flow-mcp` arranca la 1.2.0.
 
 ## Resultado
 
@@ -257,4 +257,4 @@ distinta. Pero el orden de magnitud explica el reporte original.
 | 3 | hecha | Escrituras de 350–850 a 90–230 car.; `simulate_message` 2,024 → 490; `list_trees` 3,691 → 444 |
 | 4 | hecha | Un flujo de 3 hojas enlazadas en 1 llamada; entrenar en 1 llamada en vez de 1 + N consultas |
 | 5 | hecha | Por llamada: ~14,650 → ~7,100 tokens (36 de 67 herramientas por defecto) |
-| 6 | lista salvo el push | Espera el visto bueno para subir a `main` |
+| 6 | hecha | En `main` desde el 6-oct-2026; npx ya sirve la 1.2.0 |
