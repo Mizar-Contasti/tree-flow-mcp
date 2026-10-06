@@ -99,7 +99,7 @@ espera, dice si quedó listo y, con probar, prueba mensajes en la misma llamada.
 los cambios no surten efecto y nada avisa.
 
 TEXTOS CON HUECOS: {$variable}. La sintaxis {{ }} ya no existe e imprime otra cosa.
-Guía de referencia (plantillas, APIs, scripts, hojas, capturas, suites): treeflow_guide.
+Guía de referencia (plantillas, bloques, APIs, scripts, hojas, capturas, suites): treeflow_guide.
 
 El workspace sale de la API key: no lo pidas. Los secretos salen como ***; devolverlos así no
 los pisa.${active.has('respaldos') ? ' Antes de cambios grandes, treeflow_create_backup.' : ''} ${irreversible} con el

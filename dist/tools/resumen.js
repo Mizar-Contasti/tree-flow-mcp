@@ -116,7 +116,10 @@ export function templateLine(template) {
     const text = template.text || template.responses?.find((r) => r?.type === 'text')?.value;
     if (text)
         parts.push(`"${clip(text, 50)}"`);
-    const blocks = (template.responses ?? []).map((r) => r?.type).filter((t) => t && t !== 'text');
+    // Los bloques enriquecidos van dentro de un payload: se nombran ellos, no el payload.
+    const blocks = (template.responses ?? [])
+        .flatMap((r) => (r?.type === 'payload' && Array.isArray(r.value) ? r.value.map((b) => b?.type) : [r?.type]))
+        .filter((t) => t && t !== 'text');
     if (blocks.length)
         parts.push(`bloques: ${[...new Set(blocks)].join(', ')}`);
     return parts.join(' · ');

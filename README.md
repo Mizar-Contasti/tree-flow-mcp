@@ -111,13 +111,13 @@ Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
 * `treeflow_get_detail(tipo, ref)`: el detalle de una hoja, intención, entidad, plantilla, API o script, por ID o nombre.
 * `treeflow_create_branch` / `treeflow_update_branch`: las ramas (flujos) del canvas. Una rama nueva trae su hoja Start.
 * `treeflow_create_leaf` / `treeflow_update_leaf`: las hojas. `create_leaf` recibe una lista, las enlaza entre sí con `"ref:<ref>"` y las conecta desde una hoja existente con `connect`; `update_leaf` combina el config (una clave en `null` se borra) y acepta `add_routes` / `remove_routes`.
-* `treeflow_create_intent` / `treeflow_update_intent`: intenciones NLU. `create_intent` recibe una lista; `update_intent` acepta `add_patterns` / `remove_patterns`.
+* `treeflow_create_intent` / `treeflow_update_intent`: intenciones NLU. `create_intent` recibe una lista; `update_intent` acepta `add_patterns` / `remove_patterns`. Cada parámetro es `{ parameterName, entity, required, prompt }`, con la entidad por nombre (`color`, `sys.number`): el MCP la resuelve a su ID.
 * `treeflow_create_entity` / `treeflow_update_entity`: entidades. Igual, con `add_values` / `remove_values`.
-* `treeflow_save_message_template`: plantillas de mensaje.
+* `treeflow_save_message_template`: plantillas de mensaje: un texto, o bloques enriquecidos (botones, tarjetas…) dentro de un `payload`.
 * `treeflow_delete(tipo, ref)`: borra una rama, hoja, intención, entidad, plantilla, API, script, captura, transferencia o suite.
 * `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine; con `probar`, prueba mensajes al terminar) y consultar el estado.
 * `treeflow_simulate_message`: probar el bot, siguiendo una conversación con su `session_id`.
-* `treeflow_guide(tema)`: referencia de plantillas, APIs, scripts, hojas, capturas y suites.
+* `treeflow_guide(tema)`: referencia de plantillas, bloques enriquecidos, APIs, scripts, hojas, capturas y suites.
 
 ### Capturas
 * `treeflow_list_captures` / `treeflow_get_capture` / `treeflow_save_capture`.

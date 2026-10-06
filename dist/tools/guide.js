@@ -19,6 +19,26 @@ Respuesta de una API guardada en un parámetro: {$api.estado}, {$api.items[0]}.
 Un JSON literal ({"a": 1}), CSS o una regex pasan intactos; dentro de un JSON el hueco sí se
   resuelve: {"cliente": "{$nombre}"}.
 {{ }} YA NO EXISTE: no falla, imprime otra cosa ({{$x}} sale como "{Ana}"). Usa {$x}.`,
+    bloques: `BLOQUES ENRIQUECIDOS (treeflow_save_message_template)
+Las responses de una plantilla son variantes: { type: "text", value: "Hola {$nombre}" } o
+  { type: "payload", value: [bloque, bloque…] }. platform opcional: sin él es el canal general;
+  web, telegram, whatsapp… dan a ese canal su propia respuesta.
+De cada canal sale UNA variante al azar: un texto y un payload del mismo canal no salen juntos.
+  Para texto con botones, todo en un payload: [párrafo, botones].
+Bloque: { type, items: [...] } (align "vertical" u "horizontal", default vertical).
+  paragraph   items [{ text }]
+  buttons, quick_replies   items [{ label, type, payload }]; type: text (envía el texto de
+              payload), postback (valor oculto), link (payload es la URL), event (nombre del evento)
+  image       items [{ url, alt? }], layout single|grid
+  card, carousel   items [{ title, subtitle?, imageUrl?, actions?: [botón] }]
+  video, audio, file   items [{ url }] (file además filename)
+  accordion   items [{ title, content }]
+  dropdown    items [{ label, value }], placeholder, buttonLabel, actionType postback|text
+  location    items [{ lat, long, title? }] · html  items [{ html }] · divider  items []
+Ej.: [{ "type": "payload", "value": [{ "type": "paragraph", "items": [{ "text": "¿Qué deseas?" }] },
+  { "type": "buttons", "items": [{ "label": "Ver menú", "type": "text", "payload": "ver menú" }] }] }]
+Los textos de los bloques admiten {$variable}. En las capturas, prompt_blocks y fallback_blocks
+  son listas de bloques, y prompt_responses y fallback_responses, variantes como éstas.`,
     apis: `HERRAMIENTAS API (treeflow_save_tool, treeflow_test_tool)
 Campos planos: url, method (POST por defecto), body (JSON como texto), timeout (ms),
   authType + authConfig, inputVariables, outputVariables, errorMessage.
@@ -62,7 +82,7 @@ instante y sin reentrenar.
   limit: cuántas veces insiste (default 1) · on_limit_action al llegar al límite:
     next_param (pasa al siguiente parámetro), respond_anyway (responde sin el dato),
     skip_to_context (salta al contexto).
-  *_rich + *_blocks: la pregunta o el fallback como bloques enriquecidos.
+  *_rich + *_blocks: la pregunta o el fallback como bloques enriquecidos (treeflow_guide("bloques")).
   *_template_id: usar una plantilla de mensaje como pregunta o fallback.`,
     suites: `SUITES DE PRUEBA (treeflow_save_test_suite, treeflow_run_test_suite)
 Caso: { nombre, turnos: [{ mensaje, asserts: [{ tipo, valor, nombre? }] }] }. Cada caso corre en

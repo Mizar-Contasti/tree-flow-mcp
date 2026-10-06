@@ -1,17 +1,16 @@
+import { paramsNeedEntities } from '../client/treeflowClient.js';
 import { intentLine } from './resumen.js';
 import { inBatch, ok } from './util.js';
 // Esquema de los parámetros de una intención, compartido por crear y actualizar.
-const paramsSchema = {
-    type: 'array',
-    items: {
-        type: 'object',
-        properties: {
-            name: { type: 'string', description: 'Nombre del parámetro/variable' },
-            entity_name: { type: 'string', description: 'Entidad asignada (ej. sys.number, @tipo_habitacion)' },
-            required: { type: 'boolean', description: 'Si el slot es obligatorio' },
-            prompt: { type: 'string', description: 'Pregunta si falta el valor' },
-        },
-        required: ['name', 'entity_name'],
+// La entidad va por nombre: el cliente la resuelve a su ID, que es lo que guarda el backend.
+const paramItem = {
+    type: 'object',
+    properties: {
+        parameterName: { type: 'string', description: 'La variable, {$parameterName} (default: el nombre de la entidad)' },
+        entity: { type: 'string', description: 'Entidad por nombre (ej. color) o de sistema (sys.number, sys.date…)' },
+        required: { type: 'boolean', description: 'Si falta, el bot lo pregunta' },
+        prompt: { type: 'string', description: 'La pregunta si falta. Admite {$variable}' },
+        capture_id: { type: 'string', description: 'Captura que da pregunta, respaldo y límite' },
     },
 };
 export function registerIntentTools(client) {
@@ -31,7 +30,7 @@ export function registerIntentTools(client) {
                             properties: {
                                 name: { type: 'string', description: 'Nombre único (ej. reservar_mesa)' },
                                 patterns: { type: 'array', items: { type: 'string' }, description: 'Frases de entrenamiento; entidades como @nombre' },
-                                entities: { ...paramsSchema, description: 'Parámetros a extraer' },
+                                entities: { type: 'array', items: { ...paramItem, required: ['entity'] }, description: 'Parámetros a extraer' },
                                 type: { type: 'string', description: 'conversational (default) o contextual' },
                             },
                             required: ['name', 'patterns'],
@@ -40,13 +39,20 @@ export function registerIntentTools(client) {
                 },
                 required: ['tree_id', 'intents'],
             },
-            handler: async (args) => ok(await inBatch('Intenciones', args.intents, (i) => i.name, async (i) => intentLine(await client.createIntent(args.tree_id, { ...i, type: i.type || 'conversational' })))),
+            handler: async (args) => {
+                // Las entidades del bot se leen una vez para todo el lote, y sólo si hacen falta.
+                const known = (args.intents ?? []).some((i) => paramsNeedEntities(i.entities))
+                    ? await client.listEntities(args.tree_id)
+                    : undefined;
+                return ok(await inBatch('Intenciones', args.intents, (i) => i.name, async (i) => intentLine(await client.createIntent(args.tree_id, { ...i, type: i.type || 'conversational' }, known))));
+            },
         },
         {
             name: 'treeflow_update_intent',
             description: 'Actualiza una intención: nombre, frases o parámetros. Lo que no mandes se conserva. Para añadir o quitar ' +
                 'frases usa add_patterns / remove_patterns (no hace falta leerlas antes); patterns y entities, si los ' +
-                'mandas, sustituyen la lista completa. Después hay que reentrenar.',
+                'mandas, sustituyen la lista completa. Un parámetro que ya existía (mismo parameterName) conserva lo que ' +
+                'no mandes de él. Después hay que reentrenar.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -56,7 +62,7 @@ export function registerIntentTools(client) {
                     add_patterns: { type: 'array', items: { type: 'string' }, description: 'Frases a añadir (las repetidas se ignoran)' },
                     remove_patterns: { type: 'array', items: { type: 'string' }, description: 'Frases a quitar, escritas igual' },
                     patterns: { type: 'array', items: { type: 'string' }, description: 'Sustituye TODAS las frases' },
-                    entities: { ...paramsSchema, description: 'Sustituye TODOS los parámetros' },
+                    entities: { type: 'array', items: paramItem, description: 'Sustituye TODOS los parámetros' },
                 },
                 required: ['tree_id', 'intent_id'],
             },

@@ -7,19 +7,23 @@ export function registerTemplateTools(client: TreeflowClient) {
     {
       name: 'treeflow_save_message_template',
       description:
-        'Crea (sin template_id) o modifica (con template_id) una plantilla de mensaje: un texto de respaldo y, si ' +
-        'hace falta, bloques enriquecidos. Al modificar sólo hace falta mandar lo que cambia; responses, si lo mandas, ' +
-        'sustituye todos los bloques. Para el formato de los bloques, copia el de una plantilla existente ' +
-        '(treeflow_get_detail con tipo template).',
+        'Crea (sin template_id) o modifica (con template_id) una plantilla de mensaje. Con sólo text basta para un ' +
+        'mensaje de texto. Para botones, tarjetas, imágenes… usa responses: { type: "payload", value: [bloques] }; ' +
+        'formato de los bloques: treeflow_guide("bloques"). Al modificar sólo hace falta mandar lo que cambia; ' +
+        'responses, si lo mandas, sustituye todas las respuestas.',
       inputSchema: {
         type: 'object',
         properties: {
           tree_id: { type: 'string', description: 'ID del bot/árbol' },
           template_id: { type: 'string', description: 'Para modificar. Sin él se crea una nueva' },
           name: { type: 'string', description: 'Obligatorio al crear (ej. menu_principal)' },
-          text: { type: 'string', description: 'Texto de respaldo. Admite { $variable }' },
+          text: { type: 'string', description: 'El mensaje en texto. Admite {$variable}' },
           description: { type: 'string' },
-          responses: { type: 'array', items: { type: 'object' }, description: 'Bloques enriquecidos' },
+          responses: {
+            type: 'array',
+            description: 'Respuestas: { type: "text", value } o { type: "payload", value: [bloques] }, con platform opcional (web, telegram…)',
+            items: { type: 'object' },
+          },
         },
         required: ['tree_id'],
       },
@@ -27,13 +31,10 @@ export function registerTemplateTools(client: TreeflowClient) {
         const { tree_id, template_id, ...fields } = args;
         if (template_id) return ok(`Plantilla actualizada: ${templateLine(await client.updateMessageTemplate(template_id, fields))}`);
         if (!fields.name) throw new Error('Para crear una plantilla hace falta name (para modificar una, manda template_id).');
-        const result = await client.createMessageTemplate(tree_id, {
-          name: fields.name,
-          text: fields.text || fields.name,
-          description: fields.description,
-          responses: fields.responses || [{ type: 'text', text: fields.text || fields.name }],
-        });
-        return ok(`Plantilla creada: ${templateLine(result)}`);
+        if (!fields.text && !fields.responses?.length) {
+          throw new Error('Para crear una plantilla hace falta text o responses: si no, el bot no tiene nada que decir.');
+        }
+        return ok(`Plantilla creada: ${templateLine(await client.createMessageTemplate(tree_id, { ...fields, name: fields.name }))}`);
       },
     },
   ];

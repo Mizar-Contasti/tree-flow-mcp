@@ -40,7 +40,11 @@ export const intents = [
   {
     id: 'int-precio', name: 'consultar_precio', type: 'conversational', patterns: ['cuánto cuesta @producto'],
     displayPatterns: ['cuánto cuesta el producto'],
-    entities: [{ name: '@producto', parameterName: 'producto', required: true, prompt: '¿Qué producto?' }],
+    // Como los guarda el editor: name es la entidad, key/entityId su ID, parameterName la variable.
+    entities: [{
+      name: 'producto', key: 'ent-producto', entityId: 'ent-producto', parameterName: 'producto',
+      required: true, prompt: '¿Qué producto?', capture_id: null, fallback: 'No conozco ese producto', limit: 2,
+    }],
   },
 ];
 

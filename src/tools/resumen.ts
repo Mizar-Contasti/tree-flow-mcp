@@ -123,7 +123,10 @@ export function templateLine(template: any): string {
   const parts = [`- ${template.name} [${template.id}]`];
   const text = template.text || template.responses?.find((r: any) => r?.type === 'text')?.value;
   if (text) parts.push(`"${clip(text, 50)}"`);
-  const blocks = (template.responses ?? []).map((r: any) => r?.type).filter((t: any) => t && t !== 'text');
+  // Los bloques enriquecidos van dentro de un payload: se nombran ellos, no el payload.
+  const blocks = (template.responses ?? [])
+    .flatMap((r: any) => (r?.type === 'payload' && Array.isArray(r.value) ? r.value.map((b: any) => b?.type) : [r?.type]))
+    .filter((t: any) => t && t !== 'text');
   if (blocks.length) parts.push(`bloques: ${[...new Set(blocks)].join(', ')}`);
   return parts.join(' · ');
 }

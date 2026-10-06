@@ -14,6 +14,39 @@ export interface Route {
 export declare function editRoutes(config: Record<string, any>, add?: Route[], remove?: string[]): Record<string, any>;
 /** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
 export declare function editList(current: string[], add?: string[], remove?: string[]): string[];
+export interface IntentParamInput {
+    parameterName?: string;
+    entity?: string;
+    required?: boolean;
+    prompt?: string;
+    [key: string]: any;
+}
+/** ¿Hay que consultar las entidades del bot para guardar estos parámetros? */
+export declare function paramsNeedEntities(params?: IntentParamInput[]): boolean;
+/**
+ * Pasa los parámetros a la forma guardada, resolviendo la entidad por ID o por nombre.
+ * Acepta también la forma guardada (copiada de treeflow_get_detail) y la vieja
+ * { name: variable, entity_name }. Una entidad que no existe es error, no un parámetro vacío.
+ */
+export declare function normalizeIntentParams(params: IntentParamInput[] | undefined, entities?: any[]): {
+    name: string;
+    key: string;
+    entityId: string;
+    parameterName: string;
+    required: boolean;
+    prompt?: string;
+}[];
+export declare const RICH_BLOCK_TYPES: readonly ["paragraph", "image", "video", "audio", "file", "buttons", "quick_replies", "accordion", "dropdown", "location", "divider", "card", "carousel", "html"];
+/** Un bloque enriquecido con los campos que pone el editor al crearlo. */
+export declare function normalizeBlock(block: any): Record<string, any>;
+/**
+ * Lleva las respuestas a la forma guardada. Corrige lo que un modelo suele mandar mal:
+ * { type: 'text', text } en vez de value, y bloques sueltos en vez de dentro de un
+ * payload (los seguidos del mismo canal forman un solo mensaje).
+ */
+export declare function normalizeTemplateResponses(responses: any[] | undefined): any[];
+/** El texto de la plantilla, como lo calcula el editor: el del primer bloque de texto del canal general. */
+export declare function defaultTemplateText(responses: any[] | undefined): string | undefined;
 export interface ToolVariableInput {
     name: string;
     type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
@@ -119,17 +152,29 @@ export declare class TreeflowClient {
     }): Promise<any>;
     deleteLeaf(leafId: string): Promise<any>;
     listIntents(treeId: string): Promise<any>;
+    /**
+     * Los parámetros en la forma guardada. Las entidades del bot sólo se leen si algún
+     * parámetro usa una propia (las de sistema no hacen falta), o se reciben ya leídas.
+     */
+    resolveIntentParams(treeId: string, params: IntentParamInput[] | undefined, knownEntities?: any[]): Promise<{
+        name: string;
+        key: string;
+        entityId: string;
+        parameterName: string;
+        required: boolean;
+        prompt?: string;
+    }[]>;
     createIntent(treeId: string, data: {
         name: string;
         patterns: string[];
-        entities?: any[];
+        entities?: IntentParamInput[];
         type?: string;
-    }): Promise<any>;
+    }, knownEntities?: any[]): Promise<any>;
     getIntent(treeId: string, intentId: string): Promise<any>;
     updateIntent(treeId: string, intentId: string, data: {
         name?: string;
         patterns?: string[];
-        entities?: any[];
+        entities?: IntentParamInput[];
         type?: string;
         add_patterns?: string[];
         remove_patterns?: string[];
@@ -159,6 +204,7 @@ export declare class TreeflowClient {
         description?: string;
         responses?: any[];
     }): Promise<any>;
+    getMessageTemplate(templateId: string): Promise<any>;
     updateMessageTemplate(templateId: string, data: {
         name?: string;
         text?: string;

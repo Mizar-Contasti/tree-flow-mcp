@@ -1,4 +1,4 @@
-import { TreeflowClient } from '../client/treeflowClient.js';
+import { IntentParamInput, TreeflowClient } from '../client/treeflowClient.js';
 export declare function registerIntentTools(client: TreeflowClient): ({
     name: string;
     description: string;
@@ -26,16 +26,16 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                             description: string;
                         };
                         entities: {
-                            description: string;
                             type: string;
                             items: {
+                                required: string[];
                                 type: string;
                                 properties: {
-                                    name: {
+                                    parameterName: {
                                         type: string;
                                         description: string;
                                     };
-                                    entity_name: {
+                                    entity: {
                                         type: string;
                                         description: string;
                                     };
@@ -47,9 +47,13 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                                         type: string;
                                         description: string;
                                     };
+                                    capture_id: {
+                                        type: string;
+                                        description: string;
+                                    };
                                 };
-                                required: string[];
                             };
+                            description: string;
                         };
                         type: {
                             type: string;
@@ -73,7 +77,7 @@ export declare function registerIntentTools(client: TreeflowClient): ({
         intents: {
             name: string;
             patterns: string[];
-            entities?: any[];
+            entities?: IntentParamInput[];
             type?: string;
         }[];
     }) => Promise<{
@@ -122,16 +126,15 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                 description: string;
             };
             entities: {
-                description: string;
                 type: string;
                 items: {
                     type: string;
                     properties: {
-                        name: {
+                        parameterName: {
                             type: string;
                             description: string;
                         };
-                        entity_name: {
+                        entity: {
                             type: string;
                             description: string;
                         };
@@ -143,9 +146,13 @@ export declare function registerIntentTools(client: TreeflowClient): ({
                             type: string;
                             description: string;
                         };
+                        capture_id: {
+                            type: string;
+                            description: string;
+                        };
                     };
-                    required: string[];
                 };
+                description: string;
             };
             intents?: undefined;
         };
@@ -156,7 +163,7 @@ export declare function registerIntentTools(client: TreeflowClient): ({
         intent_id: string;
         name?: string;
         patterns?: string[];
-        entities?: any[];
+        entities?: IntentParamInput[];
         add_patterns?: string[];
         remove_patterns?: string[];
     }) => Promise<{

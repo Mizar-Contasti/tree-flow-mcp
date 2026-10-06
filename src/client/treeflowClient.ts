@@ -70,6 +70,162 @@ function normalizeEntityValues(values?: any[]) {
   }));
 }
 
+// ── Parámetros de una intención ───────────────────────────────────────────
+// Se guardan como los guarda el editor: name es el NOMBRE de la entidad, key y entityId
+// su ID ("sys.number" en las de sistema) y parameterName la variable ({$parameterName}).
+// El modelo manda { parameterName, entity } con la entidad por nombre; un campo que el
+// backend no conoce (entity_name) lo descartaba y el parámetro quedaba sin entidad.
+
+export interface IntentParamInput {
+  parameterName?: string;
+  entity?: string;
+  required?: boolean;
+  prompt?: string;
+  [key: string]: any;
+}
+
+const stripAt = (ref: unknown) => String(ref ?? '').trim().replace(/^@/, '');
+const isSystemEntity = (ref: string) => ref.startsWith('sys.');
+
+/** ¿Hay que consultar las entidades del bot para guardar estos parámetros? */
+export function paramsNeedEntities(params?: IntentParamInput[]) {
+  return (params ?? []).some((p) => {
+    const ref = stripAt(p?.entity ?? p?.entity_name ?? p?.key ?? p?.entityId ?? p?.name);
+    return ref && !isSystemEntity(ref);
+  });
+}
+
+/**
+ * Pasa los parámetros a la forma guardada, resolviendo la entidad por ID o por nombre.
+ * Acepta también la forma guardada (copiada de treeflow_get_detail) y la vieja
+ * { name: variable, entity_name }. Una entidad que no existe es error, no un parámetro vacío.
+ */
+export function normalizeIntentParams(params: IntentParamInput[] | undefined, entities: any[] = []) {
+  const byId = new Map(entities.map((e) => [String(e.id), e]));
+  const byName = new Map(entities.map((e) => [String(e.name), e]));
+  const byLowerName = new Map(entities.map((e) => [String(e.name).toLowerCase(), e]));
+
+  return (params ?? []).map((p, i) => {
+    const { entity, entity_name, parameterName, ...rest } = p ?? {};
+    const explicit = entity ?? entity_name;
+    const ref = stripAt(explicit ?? p?.key ?? p?.entityId ?? p?.name);
+    if (!ref) throw new Error(`Al parámetro ${parameterName ?? p?.name ?? i + 1} le falta entity (la entidad, ej. sys.number o color).`);
+
+    let id: string;
+    let name: string;
+    if (isSystemEntity(ref)) {
+      id = name = ref;
+    } else {
+      const found = byId.get(ref) ?? byName.get(ref) ?? byLowerName.get(ref.toLowerCase());
+      if (!found) {
+        const own = entities.filter((e) => !isSystemEntity(String(e.id))).map((e) => e.name);
+        throw new Error(
+          `No existe la entidad "${ref}" en este bot. Entidades: ${own.join(', ') || 'ninguna'}; ` +
+          'de sistema: sys.number, sys.date, sys.time, sys.email, sys.phone… Créala antes con treeflow_create_entity.'
+        );
+      }
+      id = String(found.id);
+      name = String(found.name);
+    }
+
+    // Con la entidad aparte, un name distinto de ella es el nombre de la variable (forma vieja).
+    const oldStyleName = explicit && p?.name && p.name !== name && p.name !== id ? String(p.name) : undefined;
+    return {
+      ...rest,
+      name,
+      key: id,
+      entityId: id,
+      parameterName: stripAt(parameterName || oldStyleName || name),
+      required: !!p?.required,
+    };
+  });
+}
+
+// ── Respuestas de una plantilla de mensaje ────────────────────────────────
+// Como las guarda el editor: [{ type: 'text', value }, { type: 'payload', value: [bloques] }],
+// cada una con un platform opcional (sin él, el canal general). Los bloques enriquecidos van
+// DENTRO de un payload; sueltos, el motor no los muestra.
+
+export const RICH_BLOCK_TYPES = [
+  'paragraph', 'image', 'video', 'audio', 'file', 'buttons', 'quick_replies',
+  'accordion', 'dropdown', 'location', 'divider', 'card', 'carousel', 'html',
+] as const;
+const RICH_BLOCKS = new Set<string>(RICH_BLOCK_TYPES);
+
+const asAction = (a: any) => {
+  if (typeof a === 'string') return { label: a, type: 'text', payload: a };
+  const payload = a?.payload ?? a?.value ?? a?.url ?? a?.label ?? '';
+  return { ...a, label: a?.label ?? String(payload), type: a?.type ?? (a?.url ? 'link' : 'text'), payload };
+};
+
+/** Un bloque enriquecido con los campos que pone el editor al crearlo. */
+export function normalizeBlock(block: any) {
+  if (!block || typeof block !== 'object' || !RICH_BLOCKS.has(block.type)) {
+    throw new Error(`Bloque desconocido ${JSON.stringify(block?.type ?? block)}. Tipos: ${RICH_BLOCK_TYPES.join(', ')}.`);
+  }
+  const out: Record<string, any> = { align: 'vertical', ...block };
+  if (block.type === 'paragraph' && !Array.isArray(block.items) && typeof block.text === 'string') {
+    delete out.text;
+    out.items = [{ text: block.text }];
+  }
+  if (block.type === 'divider') out.items ??= [];
+  if (!Array.isArray(out.items)) {
+    throw new Error(`El bloque ${block.type} necesita items (una lista). Formato de cada bloque: treeflow_guide("bloques").`);
+  }
+  if (block.type === 'paragraph') out.items = out.items.map((it: any) => (typeof it === 'string' ? { text: it } : it));
+  if (block.type === 'buttons' || block.type === 'quick_replies') out.items = out.items.map(asAction);
+  if (block.type === 'buttons') out.layout ??= 'vertical';
+  if (block.type === 'image') out.layout ??= 'single';
+  return out;
+}
+
+/**
+ * Lleva las respuestas a la forma guardada. Corrige lo que un modelo suele mandar mal:
+ * { type: 'text', text } en vez de value, y bloques sueltos en vez de dentro de un
+ * payload (los seguidos del mismo canal forman un solo mensaje).
+ */
+export function normalizeTemplateResponses(responses: any[] | undefined) {
+  const out: any[] = [];
+  let group: { platform?: string; value: any[] } | undefined;
+  const withPlatform = (r: any, platform?: string) => (platform ? { ...r, platform } : r);
+
+  for (const r of responses ?? []) {
+    if (typeof r === 'string') {
+      group = undefined;
+      out.push({ type: 'text', value: r });
+      continue;
+    }
+    const platform: string | undefined = r?.platform || undefined;
+    if (RICH_BLOCKS.has(r?.type)) {
+      const { platform: _p, ...block } = r;
+      if (group && group.platform === platform) group.value.push(normalizeBlock(block));
+      else out.push((group = withPlatform({ type: 'payload', value: [normalizeBlock(block)] }, platform)));
+      continue;
+    }
+    group = undefined;
+    if (r?.type === 'text' || (r?.type === undefined && typeof (r?.value ?? r?.text) === 'string')) {
+      const { text, ...rest } = r;
+      out.push({ ...rest, type: 'text', value: String(r.value ?? text ?? '') });
+    } else if (r?.type === 'payload' && Array.isArray(r.value)) {
+      out.push({ ...r, value: r.value.map(normalizeBlock) });
+    } else if (r?.type === 'payload' || r?.type === 'json') {
+      out.push(r);
+    } else {
+      throw new Error(
+        `Respuesta desconocida ${JSON.stringify(r?.type ?? r)}: usa { type: "text", value } o ` +
+        '{ type: "payload", value: [bloques] }. Formato: treeflow_guide("bloques").'
+      );
+    }
+  }
+  return out;
+}
+
+/** El texto de la plantilla, como lo calcula el editor: el del primer bloque de texto del canal general. */
+export function defaultTemplateText(responses: any[] | undefined): string | undefined {
+  const block = (responses ?? []).find((r) => (!r?.platform || r.platform === 'default') && r?.type === 'text');
+  return typeof block?.value === 'string' ? block.value : undefined;
+}
+
 
 // ── Herramientas (APIs) y scripts ─────────────────────────────────────────
 // La app guarda cada herramienta con campos planos (url, method, body, authType,
@@ -352,14 +508,29 @@ export class TreeflowClient {
     return response.data;
   }
 
+  /**
+   * Los parámetros en la forma guardada. Las entidades del bot sólo se leen si algún
+   * parámetro usa una propia (las de sistema no hacen falta), o se reciben ya leídas.
+   */
+  async resolveIntentParams(treeId: string, params: IntentParamInput[] | undefined, knownEntities?: any[]) {
+    if (!params?.length) return [];
+    const entities = paramsNeedEntities(params) ? knownEntities ?? (await this.listEntities(treeId)) : [];
+    return normalizeIntentParams(params, entities);
+  }
+
   // IntentSchema exige id y type en la creación.
-  async createIntent(treeId: string, data: { name: string; patterns: string[]; entities?: any[]; type?: string }) {
+  async createIntent(
+    treeId: string,
+    data: { name: string; patterns: string[]; entities?: IntentParamInput[]; type?: string },
+    knownEntities?: any[]
+  ) {
+    const entities = await this.resolveIntentParams(treeId, data.entities, knownEntities);
     const response = await this.client.post(`/trees/${treeId}/intents`, {
       id: randomUUID(),
       name: data.name,
       type: data.type || 'conversational',
       patterns: data.patterns,
-      entities: data.entities ?? [],
+      entities,
     });
     return response.data;
   }
@@ -374,10 +545,21 @@ export class TreeflowClient {
   async updateIntent(
     treeId: string,
     intentId: string,
-    data: { name?: string; patterns?: string[]; entities?: any[]; type?: string; add_patterns?: string[]; remove_patterns?: string[] }
+    data: { name?: string; patterns?: string[]; entities?: IntentParamInput[]; type?: string; add_patterns?: string[]; remove_patterns?: string[] }
   ) {
-    const current = await this.getIntent(treeId, intentId);
     const { add_patterns, remove_patterns, ...fields } = data;
+    const current = await this.getIntent(treeId, intentId);
+    // Sin entities se conservan los guardados tal cual; con ellas se sustituye la lista,
+    // pero un parámetro que ya existía (mismo parameterName) conserva lo que no se mandó:
+    // su captura, su respaldo, su límite… y su entidad, si no se manda otra.
+    if (fields.entities !== undefined) {
+      const saved: any[] = current?.entities ?? [];
+      const merged = fields.entities.map((p) => {
+        const same = p?.parameterName ? saved.find((s) => s?.parameterName === p.parameterName) : undefined;
+        return same ? { ...same, ...p } : p;
+      });
+      fields.entities = await this.resolveIntentParams(treeId, merged);
+    }
     const body: Record<string, any> = { ...current, ...pickDefined(fields) };
     if (add_patterns?.length || remove_patterns?.length) {
       body.patterns = editList(body.patterns ?? [], add_patterns, remove_patterns);
@@ -457,13 +639,42 @@ export class TreeflowClient {
     return response.data;
   }
 
+  // `text` es lo que el motor dice en un canal sin respuesta propia, y lo que acompaña a un
+  // payload. El editor lo copia del primer bloque de texto del canal general al guardar;
+  // aquí se hace igual para que la plantilla se vea y se edite en la app como se creó.
   async createMessageTemplate(treeId: string, data: { name: string; text?: string; description?: string; responses?: any[] }) {
-    const response = await this.client.post(`/design/${treeId}/messages`, data);
+    const responses = data.responses?.length
+      ? normalizeTemplateResponses(data.responses)
+      : data.text ? [{ type: 'text', value: data.text }] : [];
+    const response = await this.client.post(`/design/${treeId}/messages`, {
+      name: data.name,
+      text: data.text ?? defaultTemplateText(responses) ?? '',
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      responses,
+    });
     return response.data;
   }
 
+  async getMessageTemplate(templateId: string) {
+    const response = await this.client.get(`/design/messages/${encodeURIComponent(templateId)}`);
+    return response.data;
+  }
+
+  // El motor contesta con las respuestas antes que con `text`: cambiar sólo el texto
+  // dejaba al bot diciendo el bloque viejo. Por eso el texto nuevo va también a ese bloque.
   async updateMessageTemplate(templateId: string, data: { name?: string; text?: string; description?: string; responses?: any[] }) {
-    const response = await this.client.put(`/design/messages/${templateId}`, data);
+    const body: Record<string, any> = pickDefined(data);
+    if (data.responses !== undefined) {
+      body.responses = normalizeTemplateResponses(data.responses);
+      if (data.text === undefined) body.text = defaultTemplateText(body.responses) ?? '';
+    } else if (data.text !== undefined) {
+      const current = await this.getMessageTemplate(templateId);
+      const saved: any[] = current?.responses ?? [];
+      const i = saved.findIndex((r) => (!r?.platform || r.platform === 'default') && r?.type === 'text');
+      if (i !== -1) body.responses = saved.map((r, j) => (j === i ? { ...r, value: data.text } : r));
+      else if (!saved.length) body.responses = [{ type: 'text', value: data.text }];
+    }
+    const response = await this.client.put(`/design/messages/${encodeURIComponent(templateId)}`, body);
     return response.data;
   }
 

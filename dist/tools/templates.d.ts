@@ -26,10 +26,10 @@ export declare function registerTemplateTools(client: TreeflowClient): {
             };
             responses: {
                 type: string;
+                description: string;
                 items: {
                     type: string;
                 };
-                description: string;
             };
         };
         required: string[];

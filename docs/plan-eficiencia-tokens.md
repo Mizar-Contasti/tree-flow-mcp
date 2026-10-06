@@ -134,7 +134,9 @@ Hallazgo fuera de este plan: el esquema de parámetros de `create_intent`/`updat
 documenta `{ name, entity_name, required, prompt }`, pero el backend (`EntityDef` en
 `api/intents.py`) no tiene `entity_name` y lo descarta. En los parámetros guardados,
 `name` es el nombre de la **entidad** y `key`/`entityId` su ID. Un parámetro creado por
-el MCP queda sin entidad. Pendiente de corregir aparte.
+el MCP queda sin entidad. Resuelto aparte: el modelo manda `{ parameterName, entity }` con
+la entidad por nombre y el cliente la guarda como el editor (`name`, `key`, `entityId`);
+el e2e comprueba en dev que el slot filling pide el dato.
 
 Listo cuando: en dev, cambiar sólo el `messageText` de una hoja conserva sus
 `intents`, su `nextLeafId` y sus `customResponses`.
@@ -209,7 +211,10 @@ Hallazgo fuera de este plan: `save_message_template` crea los bloques de texto c
 los formateadores del backend (`core/utils/native_rich_messages.py`) leen bloques
 `{type, items}`. El backend guarda `responses` tal cual llega. La descripción ya no
 documenta un formato de bloques: remite a copiar el de una plantilla existente. Falta
-comprobar cómo se ve en un canal una plantilla creada por el MCP.
+comprobar cómo se ve en un canal una plantilla creada por el MCP. Resuelto aparte: las
+respuestas son variantes `{type: "text", value}` o `{type: "payload", value: [bloques]}`,
+los bloques `{type, items}` van dentro del payload, y el formato está en
+`treeflow_guide("bloques")`; el e2e comprueba en dev que el motor contesta con ella.
 
 ### Fase 6 — Cierre
 - [x] README con los grupos, los cambios que rompen con 1.1.0 y cómo probar.

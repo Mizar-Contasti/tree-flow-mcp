@@ -17,7 +17,7 @@ process.chdir(ROOT);
 const dist = (p) => import(pathToFileURL(path.join(ROOT, 'dist', p)).href);
 const { TreeflowClient } = await dist('client/treeflowClient.js');
 const { buildTools } = await dist('catalog.js');
-const { shortenText } = await dist('ids.js');
+const { shortenText, lookupShort } = await dist('ids.js');
 // Lo leído directo del cliente lleva UUID completos; lo que devuelven las herramientas, cortos.
 const comoHerramienta = (v) => JSON.parse(shortenText(JSON.stringify(v)));
 
@@ -37,12 +37,29 @@ if (!tree) {
 const T = tree.tree_id;
 console.log(`Bot de pruebas: ${T}`);
 
-// Restos de una corrida anterior que falló a medias
-// (el backend guarda los nombres con guiones bajos en vez de espacios)
-for (const b of await client.listBranches(T)) if (/^Rama[ _]e2e[ _]/.test(b.name)) await client.deleteBranch(b.id);
+// Restos de una corrida anterior que falló a medias. El backend cambia los espacios de los
+// nombres por "_": "Rama e2e 1" se guarda como "Rama_e2e_1".
+const E2E_BRANCH = /^Rama[ _]e2e[ _]/;
+for (const b of await client.listBranches(T)) if (E2E_BRANCH.test(b.name)) await client.deleteBranch(b.id);
 for (const s of await client.listTestSuites(T)) if (/^Suite[ _]e2e[ _]/.test(s.name)) await client.deleteTestSuite(s.id);
 for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
 for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
+for (const m of await client.listMessageTemplates(T)) if (m.name.startsWith('e2e_')) await client.deleteMessageTemplate(m.id);
+
+// La hoja donde empieza cada conversación nueva. Para que el motor vea una intención de
+// prueba, se enlaza ahí la rama de prueba y al final se deja como estaba.
+const startOf = async () => {
+  const main = (await client.listBranches(T)).find((b) => b.is_default);
+  return { branchId: main.id, leaf: main.leaves.find((l) => l.id === main.start_leaf_id) };
+};
+{
+  // Un enlace que dejó una corrida fallida apunta a una rama que ya no existe.
+  const { branchId, leaf } = await startOf();
+  const ids = new Set((await client.listBranches(T)).map((b) => b.id));
+  const links = leaf.config?.linkedBranches ?? [];
+  const alive = links.filter((l) => ids.has(String(l).split(/[:#]/)[0]));
+  if (alive.length !== links.length) await client.updateLeaf(leaf.id, { config: { linkedBranches: alive } }, { branchId });
+}
 
 const branches = await client.listBranches(T);
 const leaves = branches.flatMap((b) => (b.leaves ?? []).map((l) => ({ ...l, branchId: b.id })));
@@ -151,53 +168,129 @@ assert.ok(!run.includes('- Saludo'), 'lo que pasó no se repite');
 await call('delete', { tree_id: T, tipo: 'test_suite', ref: suiteId });
 step('run_test_suite devuelve los totales y sólo el caso que falló (la suite se borró)');
 
-// ── Fase 4: menos vueltas ──
+// ── Plantillas: la forma que guarda el editor ──
 const stamp = Date.now();
+const idOf = (line) => line.match(/\[([^\]]+)\]/)?.[1];
+const soloTexto = idOf(await measured('save_message_template', { tree_id: T, name: `e2e_texto_${stamp}`, text: 'Hola e2e' }));
+let tpl = await json('get_detail', { tree_id: T, tipo: 'template', ref: soloTexto });
+assert.deepEqual(tpl.responses, [{ type: 'text', value: 'Hola e2e' }], 'el bloque de texto lleva value, no text');
+await call('save_message_template', { tree_id: T, template_id: soloTexto, text: 'Adiós e2e' });
+tpl = await json('get_detail', { tree_id: T, tipo: 'template', ref: soloTexto });
+assert.equal(tpl.text, 'Adiós e2e');
+assert.deepEqual(tpl.responses, [{ type: 'text', value: 'Adiós e2e' }], 'cambiar el texto cambia también el bloque que dice el bot');
+step('save_message_template guarda { type: "text", value } y al cambiar el texto cambia también el bloque');
+
+// Un párrafo con variables y un botón, mandados como bloques sueltos: van en un payload.
+const conBloques = await measured('save_message_template', {
+  tree_id: T, name: `e2e_apartado_${stamp}`,
+  responses: [
+    { type: 'paragraph', text: 'Apartadas {$cantidad} piezas de {$gema}' },
+    { type: 'buttons', items: ['Ver más joyas'] },
+  ],
+});
+assert.match(conBloques, /bloques: paragraph, buttons$/);
+const apartadoTpl = idOf(conBloques);
+tpl = await json('get_detail', { tree_id: T, tipo: 'template', ref: apartadoTpl });
+assert.equal(tpl.responses.length, 1);
+assert.equal(tpl.responses[0].type, 'payload');
+assert.deepEqual(tpl.responses[0].value.map((b) => [b.type, b.items.length]), [['paragraph', 1], ['buttons', 1]]);
+step('save_message_template guardó los bloques sueltos dentro de un payload');
+
+// ── Fase 4: menos vueltas ──
+assert.match(await measured('create_entity', { tree_id: T, entities: [{ name: `e2e_gema_${stamp}`, values: [{ key: 'zafiro', synonyms: ['zafiros'] }] }] }), /^Entidades creadas: 1 de 1/);
 const flujo = await measured('create_branch', { tree_id: T, name: `Rama e2e lote ${stamp}` });
 const flowBranch = flujo.match(/Rama "[^"]+" \[([^\]]+)\]/)[1];
 const lote = await measured('create_leaf', {
   branch_id: flowBranch,
   leaves: [
-    { ref: 'menu', leaf_type: 'trigger_context', name: 'Menu e2e', config: { intents: [{ name: `e2e_precio_${stamp}`, targetLeafId: 'ref:precio' }], events: [] } },
+    {
+      ref: 'menu', leaf_type: 'trigger_context', name: 'Menu e2e',
+      config: { intents: [{ name: `e2e_precio_${stamp}`, targetLeafId: 'ref:precio' }, { name: `e2e_apartar_${stamp}`, targetLeafId: 'ref:apartar' }], events: [] },
+    },
     { ref: 'precio', leaf_type: 'intent', name: 'Precio e2e', config: { intentName: `e2e_precio_${stamp}`, isCustomResponse: true, messageText: 'Cuesta 30 pesos', nextLeafId: 'ref:menu' } },
     { ref: 'nomatch', leaf_type: 'event', name: 'No entiendo e2e', config: { eventName: 'sys.no-match', messageText: 'No te entendí', nextLeafId: 'ref:menu' } },
+    { ref: 'apartar', leaf_type: 'intent', name: 'Apartar e2e', config: { intentName: `e2e_apartar_${stamp}`, isCustomResponse: false, messageTemplateId: apartadoTpl, nextLeafId: 'ref:menu' } },
   ],
 });
 const created = [...lote.matchAll(/- (.+?) \([^)]*\) \[([^\]]+)\]/g)].map((m) => ({ name: m[1], id: m[2] }));
-assert.equal(created.length, 3, 'deben crearse las tres hojas');
+assert.equal(created.length, 4, 'deben crearse las cuatro hojas');
 const [menuLeaf, precioLeaf] = created;
 const menuSaved = await json('get_detail', { tree_id: T, tipo: 'leaf', ref: menuLeaf.id });
 const precioSaved = await json('get_detail', { tree_id: T, tipo: 'leaf', ref: precioLeaf.id });
 assert.equal(menuSaved.config.intents[0].targetLeafId, precioLeaf.id);
 assert.equal(precioSaved.config.nextLeafId, menuLeaf.id);
-step('create_leaf creó 3 hojas enlazadas entre sí en una llamada (enlaces verificados releyéndolas)');
+step('create_leaf creó 4 hojas enlazadas entre sí en una llamada (enlaces verificados releyéndolas)');
 
 const nuevas = await measured('create_intent', {
   tree_id: T,
   intents: [
     { name: `e2e_precio_${stamp}`, patterns: ['cuánto cuesta el zafiro azul', 'precio del zafiro azul', 'qué vale el zafiro azul'] },
     { name: `e2e_horario_${stamp}`, patterns: ['a qué hora abre la joyería', 'horario de la joyería'] },
+    {
+      name: `e2e_apartar_${stamp}`,
+      patterns: ['apartar piezas de joyeria', 'me apartas piezas de joyeria', 'aparta piezas de joyeria'],
+      // La entidad propia va por nombre: el MCP la resuelve a su ID.
+      entities: [
+        { parameterName: 'cantidad', entity: 'sys.number', required: true, prompt: '¿Cuántas piezas quieres apartar?' },
+        { parameterName: 'gema', entity: `e2e_gema_${stamp}`, required: true, prompt: '¿Qué gema quieres apartar?' },
+      ],
+    },
   ],
 });
-assert.match(nuevas, /^Intenciones creadas: 2 de 2/);
-assert.match(await measured('create_entity', { tree_id: T, entities: [{ name: `e2e_gema_${stamp}`, values: [{ key: 'zafiro', synonyms: ['zafiros'] }] }] }), /^Entidades creadas: 1 de 1/);
-step('create_intent y create_entity crearon en lote');
+assert.match(nuevas, /^Intenciones creadas: 3 de 3/);
+assert.match(nuevas, /parámetros: cantidad\*, gema\*/);
+step('create_entity y create_intent crearon en lote');
+
+// Los parámetros quedaron como los guarda el editor: name es la entidad y key su ID.
+// get_detail devuelve los IDs cortos: se compara con la misma forma.
+const gemaId = shortenText((await client.listEntities(T)).find((e) => e.name === `e2e_gema_${stamp}`).id);
+const apartar = await json('get_detail', { tree_id: T, tipo: 'intent', ref: `e2e_apartar_${stamp}` });
+const pick = (p) => ({ name: p.name, key: p.key, entityId: p.entityId, parameterName: p.parameterName, required: p.required });
+assert.deepEqual(apartar.entities.map(pick), [
+  { name: 'sys.number', key: 'sys.number', entityId: 'sys.number', parameterName: 'cantidad', required: true },
+  { name: `e2e_gema_${stamp}`, key: gemaId, entityId: gemaId, parameterName: 'gema', required: true },
+]);
+step('los parámetros se guardaron con la entidad (name, key y entityId) y la variable en parameterName');
+
+// Una conversación nueva empieza en la hoja de inicio de la rama por defecto: se le
+// enlaza el menú de prueba para que el motor vea las intenciones nuevas.
+const start = await startOf();
+const linksBefore = start.leaf.config?.linkedBranches;
+// Va directo al cliente y dentro de un texto "rama:hoja": ahí nadie expande los IDs cortos.
+const completo = (id) => lookupShort(id) ?? id;
+await client.updateLeaf(start.leaf.id, { config: { linkedBranches: [...(linksBefore ?? []), `${completo(flowBranch)}:${completo(menuLeaf.id)}`] } }, { branchId: start.branchId });
 
 // Si el entrenamiento incluyó las nuevas, cuenta las mismas intenciones que hay ahora.
-// (Simular una frase no lo prueba: el motor sólo considera las intenciones conectadas a
-// la hoja actual, y una coincidencia exacta de entidad de la plantilla gana antes.)
 const intentsNow = (await client.listIntents(T)).length;
 const entrenado = await measured('trigger_training', { tree_id: T });
 assert.match(entrenado, /^Entrenamiento terminado .* can_use true/);
 assert.match(entrenado, new RegExp(` ${intentsNow} intenciones`), 'el entrenamiento debe incluir las intenciones recién creadas');
 step(`trigger_training esperó hasta el final (${entrenado.match(/en (\d+) s/)[1]} s) e incluyó las ${intentsNow} intenciones`);
 
+// ── Slot filling: el bot pide cada parámetro obligatorio que falta ──
+const turno1 = await measured('simulate_message', { tree_id: T, message: 'apartar piezas de joyeria' });
+const sesion = turno1.match(/session_id: (\S+)/)[1];
+assert.match(turno1, new RegExp(`intención e2e_apartar_${stamp}`), turno1);
+assert.match(turno1, /^Bot: "¿Cuántas piezas quieres apartar\?"/, turno1);
+assert.match(turno1, /slot filling: pidiendo/, turno1);
+const turno2 = await call('simulate_message', { tree_id: T, message: '3', session_id: sesion });
+assert.match(turno2, /^Bot: "¿Qué gema quieres apartar\?"/, turno2);
+assert.match(turno2, /slot filling: pidiendo/, turno2);
+const turno3 = await call('simulate_message', { tree_id: T, message: 'zafiros', session_id: sesion });
+assert.match(turno3, /^Bot: \[payload\] .*Apartadas 3 piezas de zafiro.*Ver más joyas/, turno3);
+assert.ok(!turno3.includes('slot filling'), turno3);
+step('simulate_message: el bot pidió cantidad (sys.number) y gema (entidad propia), y contestó con la plantilla de bloques');
+
 // Limpieza: el bot de pruebas queda como estaba
+await client.updateLeaf(start.leaf.id, { config: { linkedBranches: linksBefore ?? null } }, { branchId: start.branchId });
 for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
 for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
+for (const m of await client.listMessageTemplates(T)) if (m.name.startsWith('e2e_')) await client.deleteMessageTemplate(m.id);
 await call('delete', { tree_id: T, tipo: 'branch', ref: flowBranch }); // ID corto: por la herramienta
+assert.deepEqual((await startOf()).leaf.config?.linkedBranches, linksBefore, 'la hoja de inicio debe quedar como estaba');
 await client.trainAndWait(T, { force: true });
-step('limpieza: intenciones, entidad y rama de prueba borradas, y el bot reentrenado');
+step('limpieza: intenciones, entidad, plantillas y rama de prueba borradas, la hoja de inicio restaurada y el bot reentrenado');
+
 
 // ── Fase 7: el bot por nombre, IDs cortos, conectar al crear, entrenar y probar ──
 const esquema = await measured('get_tree_data', { tree_id: BOT });
