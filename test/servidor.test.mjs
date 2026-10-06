@@ -25,7 +25,7 @@ async function conectar(env = {}) {
 test('por defecto ofrece la base, capturas y respaldos, y la herramienta para activar el resto', async () => {
   const client = await conectar();
   try {
-    assert.equal(client.getServerVersion().version, '1.3.0');
+    assert.equal(client.getServerVersion().version, '1.3.1');
     const names = (await client.listTools()).tools.map((t) => t.name);
     assert.ok(names.includes('treeflow_get_tree_data') && names.includes('treeflow_save_capture') && names.includes('treeflow_create_backup'));
     assert.ok(!names.includes('treeflow_save_tool'), 'las APIs no vienen por defecto');
