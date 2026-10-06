@@ -118,6 +118,26 @@ export class TreeflowClient {
         const response = await this.client.get('/trees');
         return response.data;
     }
+    // El modelo suele conocer el bot por su nombre: aceptarlo ahorra la vuelta de
+    // treeflow_list_trees sólo para traducirlo. El listado se recuerda un minuto.
+    treesCache;
+    async resolveTreeId(ref) {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref))
+            return ref;
+        if (!this.treesCache || Date.now() - this.treesCache.at > 60_000) {
+            this.treesCache = { at: Date.now(), trees: await this.listTrees() };
+        }
+        const wanted = ref.trim().toLowerCase();
+        // Un ID corto (8 o 12 hexadecimales) se busca como prefijo del ID; lo demás, como nombre.
+        const byPrefix = /^[0-9a-f]{8}([0-9a-f]{4})?$/.test(wanted);
+        const matches = this.treesCache.trees.filter((t) => byPrefix ? String(t.tree_id).replace(/-/g, '').startsWith(wanted) : String(t.name).trim().toLowerCase() === wanted);
+        if (matches.length === 1)
+            return matches[0].tree_id;
+        if (matches.length > 1)
+            throw new Error(`Hay ${matches.length} bots llamados "${ref}": usa su ID.`);
+        this.treesCache = undefined; // quizá es nuevo: la próxima vez se vuelve a listar
+        throw new Error(`No existe un bot llamado "${ref}" en el workspace. treeflow_list_trees muestra los que hay.`);
+    }
     // El backend no expone GET /trees/{id}: se resuelve desde el listado del workspace.
     async getTree(treeId) {
         const trees = await this.listTrees();

@@ -65,7 +65,7 @@ test('TREEFLOW_TOOLSETS=todo carga todo y no ofrece activar nada', async () => {
   const client = await conectar({ TREEFLOW_TOOLSETS: 'todo' });
   try {
     const names = (await client.listTools()).tools.map((t) => t.name);
-    assert.equal(names.length, 67);
+    assert.equal(names.length, 62);
     assert.ok(!names.includes('treeflow_enable_tools'));
   } finally {
     await client.close();

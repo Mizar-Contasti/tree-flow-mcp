@@ -1,31 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-export declare function registerTemplateTools(client: TreeflowClient): ({
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            tree_id: {
-                type: string;
-                description: string;
-            };
-            template_id?: undefined;
-            name?: undefined;
-            text?: undefined;
-            description?: undefined;
-            responses?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        tree_id: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
+export declare function registerTemplateTools(client: TreeflowClient): {
     name: string;
     description: string;
     inputSchema: {
@@ -73,4 +47,4 @@ export declare function registerTemplateTools(client: TreeflowClient): ({
             text: string;
         }[];
     }>;
-})[];
+}[];

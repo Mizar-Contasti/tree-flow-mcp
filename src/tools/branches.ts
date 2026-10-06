@@ -1,23 +1,9 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { branchLine, branchOutline, branchesSummary, canvasNames } from './resumen.js';
+import { branchLine, branchOutline, canvasNames } from './resumen.js';
 import { ok } from './util.js';
 
 export function registerBranchTools(client: TreeflowClient) {
   return [
-    {
-      name: 'treeflow_list_branches',
-      description:
-        'Lista las ramas (flujos del canvas) de un bot, sin sus hojas: sólo cuántas tiene cada una y cuál es la de ' +
-        'inicio. Las hojas de una rama: treeflow_list_leafs.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tree_id: { type: 'string', description: 'ID del bot/árbol' },
-        },
-        required: ['tree_id'],
-      },
-      handler: async (args: { tree_id: string }) => ok(branchesSummary(await client.listBranches(args.tree_id))),
-    },
     {
       name: 'treeflow_create_branch',
       description: 'Crea una nueva rama (flujo del canvas) dentro de un bot.',

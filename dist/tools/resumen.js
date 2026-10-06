@@ -139,22 +139,43 @@ export function treeHeader(tree) {
         parts.push(`umbral difuso ${tree.fuzzy_confidence_threshold}`);
     return parts.join(' · ');
 }
-export function treeOutline(data) {
+export const SECTIONS = ['canvas', 'ramas', 'intenciones', 'entidades', 'plantillas'];
+export const DEFAULT_SECTIONS = ['canvas', 'intenciones'];
+/**
+ * El bot por secciones. canvas = ramas con una línea por hoja; ramas = sólo las ramas. Lo que
+ * no se pide se cuenta al final, para que el modelo sepa que existe y cómo pedirlo.
+ */
+export function treeOutline(data, sections = DEFAULT_SECTIONS, branchFilter) {
+    const want = new Set(sections);
+    let branches = data.branches;
+    if (branchFilter) {
+        const wanted = branchFilter.trim().toLowerCase();
+        branches = branches.filter((b) => b.id === branchFilter || String(b.name).trim().toLowerCase() === wanted);
+        if (!branches.length)
+            throw new Error(`No existe la rama "${branchFilter}". Hay: ${data.branches.map((b) => b.name).join(', ')}.`);
+    }
     const names = canvasNames(data.branches, data.templates);
-    const leafCount = data.branches.reduce((s, b) => s + (b.leaves?.length ?? 0), 0);
-    return [
-        treeHeader(data.tree),
-        DETAIL_HINT,
-        '',
-        `RAMAS (${data.branches.length}, ${leafCount} hojas)`,
-        ...data.branches.map((b) => branchOutline(b, names)),
-        '',
-        intentsSummary(data.intents),
-        '',
-        entitiesSummary(data.entities),
-        '',
-        templatesSummary(data.templates),
-    ].join('\n');
+    const leafCount = branches.reduce((s, b) => s + (b.leaves?.length ?? 0), 0);
+    const out = [treeHeader(data.tree), DETAIL_HINT];
+    if (want.has('canvas'))
+        out.push('', `RAMAS (${branches.length}, ${leafCount} hojas)`, ...branches.map((b) => branchOutline(b, names)));
+    else if (want.has('ramas'))
+        out.push('', branchesSummary(branches));
+    if (want.has('intenciones'))
+        out.push('', intentsSummary(data.intents));
+    if (want.has('entidades'))
+        out.push('', entitiesSummary(data.entities));
+    if (want.has('plantillas'))
+        out.push('', templatesSummary(data.templates));
+    const missing = [
+        !want.has('canvas') && !want.has('ramas') ? `${data.branches.length} ramas` : '',
+        !want.has('intenciones') ? `${data.intents.length} intenciones` : '',
+        !want.has('entidades') ? `${data.entities.length} entidades` : '',
+        !want.has('plantillas') ? `${data.templates.length} plantillas` : '',
+    ].filter(Boolean);
+    if (missing.length)
+        out.push('', `No incluido: ${missing.join(', ')}. Pídelo con secciones.`);
+    return out.join('\n');
 }
 // ── Herramientas del bot: APIs y scripts ─────────────────────────────────────
 const varNames = (vars) => (vars ?? []).map((v) => v?.name).filter(Boolean);

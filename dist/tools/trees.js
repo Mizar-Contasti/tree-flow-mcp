@@ -1,5 +1,5 @@
 import { maskSecrets } from '../client/treeflowClient.js';
-import { treeHeader, treeOutline, withoutNoise } from './resumen.js';
+import { DEFAULT_SECTIONS, SECTIONS, treeHeader, treeOutline, withoutNoise } from './resumen.js';
 import { ok } from './util.js';
 export function registerTreeTools(client) {
     return [
@@ -34,17 +34,19 @@ export function registerTreeTools(client) {
         },
         {
             name: 'treeflow_get_tree_data',
-            description: 'Esquema de todo el bot en una llamada: cada rama con sus hojas (una línea por hoja: tipo, ID, qué dice, ' +
-                'qué escucha y a dónde va), y las intenciones, entidades y plantillas con sus conteos. Es un resumen: ' +
-                'el detalle de una pieza se pide con treeflow_get_detail.',
+            description: 'Lee el bot por secciones, en resumen (una línea por pieza, con su ID). canvas: cada rama con sus hojas ' +
+                '(qué dicen, qué escuchan, a dónde van); ramas: sólo las ramas; intenciones, entidades, plantillas. ' +
+                'Por defecto canvas e intenciones. rama limita el canvas a una. El detalle de una pieza: treeflow_get_detail.',
             inputSchema: {
                 type: 'object',
                 properties: {
-                    tree_id: { type: 'string', description: 'ID del bot/árbol' },
+                    tree_id: { type: 'string', description: 'ID o nombre del bot' },
+                    secciones: { type: 'array', items: { type: 'string', enum: [...SECTIONS] } },
+                    rama: { type: 'string', description: 'ID o nombre de una rama' },
                 },
                 required: ['tree_id'],
             },
-            handler: async (args) => ok(treeOutline(await client.getTreeData(args.tree_id))),
+            handler: async (args) => ok(treeOutline(await client.getTreeData(args.tree_id), args.secciones?.length ? args.secciones : DEFAULT_SECTIONS, args.rama)),
         },
         {
             name: 'treeflow_create_tree',

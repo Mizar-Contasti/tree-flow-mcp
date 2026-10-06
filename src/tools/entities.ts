@@ -1,24 +1,9 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { DETAIL_HINT, entitiesSummary, entityLine } from './resumen.js';
+import { entityLine } from './resumen.js';
 import { inBatch, ok } from './util.js';
 
 export function registerEntityTools(client: TreeflowClient) {
   return [
-    {
-      name: 'treeflow_list_entities',
-      description:
-        'Lista las entidades NLU de un bot: nombre, ID, tipo, cuántos valores tiene y los primeros. Los valores ' +
-        'con sus sinónimos: treeflow_get_detail con tipo entity.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tree_id: { type: 'string', description: 'ID del bot/árbol' },
-        },
-        required: ['tree_id'],
-      },
-      handler: async (args: { tree_id: string }) =>
-        ok(`${entitiesSummary(await client.listEntities(args.tree_id))}\n${DETAIL_HINT}`),
-    },
     {
       name: 'treeflow_create_entity',
       description:

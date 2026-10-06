@@ -28,7 +28,7 @@ const tools = Object.fromEntries(buildTools(client).map((t) => [t.name.replace('
 const call = async (name, args) => texto(await tools[name].handler({ tree_id: fx.TREE_ID, ...args }));
 
 test('el esquema del bot nombra cada rama, hoja, intención, entidad y plantilla con su ID', async () => {
-  const out = await call('get_tree_data');
+  const out = await call('get_tree_data', { secciones: ['canvas', 'intenciones', 'entidades', 'plantillas'] });
   const ids = [
     ...fx.branches.flatMap((b) => [b.id, ...b.leaves.map((l) => l.id)]),
     ...fx.intents.map((i) => i.id), ...fx.entities.map((e) => e.id), ...fx.templates.map((t) => t.id),
@@ -52,26 +52,37 @@ test('un destino con otro nombre se muestra como intención→hoja', () => {
   assert.match(leafLine(leaf, names), /escucha: ver_menu→Menu/);
 });
 
-test('list_branches no trae las hojas, sólo las cuenta', async () => {
-  const out = await call('list_branches');
+test('por defecto trae canvas e intenciones, y cuenta lo que no trae', async () => {
+  const out = await call('get_tree_data');
+  assert.match(out, /RAMAS \(2, 5 hojas\)/);
+  assert.match(out, /Intenciones \(2\)/);
+  assert.ok(!out.includes('[ent-producto]') && !out.includes('[tpl-precios]'));
+  assert.match(out, /No incluido: 2 entidades, 1 plantillas\. Pídelo con secciones\./);
+});
+
+test('secciones ramas: las ramas sin sus hojas, sólo contadas', async () => {
+  const out = await call('get_tree_data', { secciones: ['ramas'] });
   assert.match(out, /Rama "Principal" \[rama-1\] · por defecto · inicio: Start · 4 hojas/);
   assert.ok(!out.includes('hoja-saludo'));
 });
 
-test('list_leafs da el esquema de una rama', async () => {
-  const out = await call('list_leafs', { branch_id: 'rama-1' });
-  assert.match(out, /- Saludo \(intent\) \[hoja-saludo\]/);
-  assert.ok(!out.includes('rama-2'));
+test('rama limita el canvas a una, por ID o por nombre', async () => {
+  for (const rama of ['rama-1', 'principal']) {
+    const out = await call('get_tree_data', { secciones: ['canvas'], rama });
+    assert.match(out, /- Saludo \(intent\) \[hoja-saludo\]/);
+    assert.ok(!out.includes('[rama-2]'));
+  }
+  await assert.rejects(call('get_tree_data', { rama: 'Nada' }), /No existe la rama "Nada"\. Hay: Principal, Menú/);
 });
 
-test('list_intents cuenta frases y marca los parámetros obligatorios', async () => {
-  const out = await call('list_intents');
+test('intenciones: cuenta frases y marca los parámetros obligatorios', async () => {
+  const out = await call('get_tree_data', { secciones: ['intenciones'] });
   assert.match(out, /- consultar_precio \[int-precio\] · 1 frases · parámetros: producto\*/);
   assert.ok(!out.includes('cuánto cuesta'), 'las frases van en el detalle');
 });
 
-test('list_entities muestra los primeros valores y el patrón de las regex', async () => {
-  const out = await call('list_entities');
+test('entidades: los primeros valores y el patrón de las regex', async () => {
+  const out = await call('get_tree_data', { secciones: ['entidades'] });
   assert.match(out, /producto \[ent-producto\] simple · 2 valores: café, té/);
   assert.match(out, /codigo_postal \[ent-cp\] regex · regex \^\[0-9\]\{5\}\$/);
 });
@@ -105,7 +116,7 @@ test('get_detail de una API enmascara secretos y recorta lastResponse', async ()
 test('get_detail con un nombre repetido pide el ID', async () => {
   const dup = clienteFalso({ listBranches: async () => [{ id: 'r', name: 'R', leaves: [{ id: 'a', name: 'Igual' }, { id: 'b', name: 'Igual' }] }] });
   const detail = buildTools(dup).find((t) => t.name === 'treeflow_get_detail');
-  await assert.rejects(detail.handler({ tree_id: 't', tipo: 'leaf', ref: 'Igual' }), /"Igual" es el nombre de 2 piezas \(a, b\): usa el ID/);
+  await assert.rejects(detail.handler({ tree_id: fx.TREE_ID, tipo: 'leaf', ref: 'Igual' }), /"Igual" es el nombre de 2 piezas \(a, b\): usa el ID/);
 });
 
 test('changedFields dice qué campos de primer nivel cambiaron', () => {

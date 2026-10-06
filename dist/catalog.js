@@ -1,3 +1,4 @@
+import { expandIds, isFullId, lookupShort, shortenText } from './ids.js';
 import { registerTreeTools } from './tools/trees.js';
 import { registerBranchTools } from './tools/branches.js';
 import { registerLeafTools } from './tools/leafs.js';
@@ -32,10 +33,13 @@ export const TOOLSETS = {
         match: /^treeflow_(list_test_suites|get_test_suite|save_test_suite|import_test_suite_csv|export_test_suite_csv|run_test_suite|list_test_runs|get_test_run|compare_test_runs)$/,
     },
     atencion: { label: 'transferencia a humano y mesa de ayuda', match: /^treeflow_(list_transfers|save_transfer|test_transfer|get_live_chat_\w+)$/ },
-    historial: { label: 'historial de cambios y de entrenamientos, y analíticas', match: /^treeflow_(list_change_history|list_training_history|get_conversation_analytics)$/ },
+    historial: {
+        label: 'conversaciones reales, historial de cambios y de entrenamientos, y analíticas',
+        match: /^treeflow_(list_conversations|get_conversation|list_change_history|list_training_history|get_conversation_analytics)$/,
+    },
     admin: {
-        label: 'canales, voz, usuarios y credenciales',
-        match: /^treeflow_(list_integrations|configure_integration|get_voice_config|update_voice_config|list_users|create_user|update_user|list_credentials)$/,
+        label: 'configuración del bot (umbrales, NLP), canales, voz, usuarios y credenciales',
+        match: /^treeflow_(get_tree|update_tree|list_integrations|configure_integration|get_voice_config|update_voice_config|list_users|create_user|update_user|list_credentials)$/,
     },
 };
 export const DEFAULT_TOOLSETS = ['capturas', 'respaldos'];
@@ -132,7 +136,7 @@ export function enableToolsTool(active, allTools, onChange) {
 }
 // Catálogo completo, agrupado por módulo para poder medirlo por partes.
 export function buildToolGroups(client) {
-    return {
+    const groups = {
         trees: registerTreeTools(client),
         detail: registerDetailTools(client),
         delete: registerDeleteTools(client),
@@ -154,6 +158,33 @@ export function buildToolGroups(client) {
         suites: registerSuiteTools(client),
         livechat: registerLiveChatTools(client),
         backups: registerBackupTools(client),
+    };
+    return Object.fromEntries(Object.entries(groups).map(([g, tools]) => [g, tools.map((t) => withIdsAndNames(client, t))]));
+}
+/**
+ * Lo que vale para todas las herramientas: a la entrada, los IDs cortos se expanden y
+ * tree_id acepta el nombre del bot; a la salida, cada UUID se muestra corto.
+ */
+function withIdsAndNames(client, tool) {
+    return {
+        ...tool,
+        handler: async (args) => {
+            // tree_id va aparte: además de un corto ya visto, acepta el nombre del bot o un
+            // prefijo de su ID, que se buscan en la lista de bots.
+            const { tree_id, ...rest } = args ?? {};
+            const input = expandIds(rest);
+            if (typeof tree_id === 'string') {
+                input.tree_id = isFullId(tree_id) ? tree_id : lookupShort(tree_id) ?? (await client.resolveTreeId(tree_id));
+            }
+            else if (tree_id !== undefined) {
+                input.tree_id = tree_id;
+            }
+            const result = await tool.handler(input);
+            for (const c of result?.content ?? [])
+                if (typeof c.text === 'string')
+                    c.text = shortenText(c.text);
+            return result;
+        },
     };
 }
 export function buildTools(client) {

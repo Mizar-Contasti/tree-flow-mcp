@@ -38,11 +38,12 @@ test('treeflow_delete borra cada tipo con la llamada que le toca', async () => {
     deleteMessageTemplate: rec('template'), deleteTool: rec('tool'), deleteScript: rec('script'),
     deleteCapture: rec('capture'), deleteTransfer: rec('transfer'), deleteTestSuite: rec('test_suite'),
   }));
+  const T = fx.TREE_ID;
   for (const tipo of ['branch', 'leaf', 'intent', 'tool', 'test_suite']) {
-    assert.equal(texto(await tools.delete.handler({ tree_id: 't', tipo, ref: `x-${tipo}` })), `Borrado: ${tipo} x-${tipo}`);
+    assert.equal(texto(await tools.delete.handler({ tree_id: T, tipo, ref: `x-${tipo}` })), `Borrado: ${tipo} x-${tipo}`);
   }
-  assert.deepEqual(calls, [['branch', 'x-branch'], ['leaf', 'x-leaf'], ['intent', 't', 'x-intent'], ['tool', 't', 'x-tool'], ['test_suite', 'x-test_suite']]);
-  await assert.rejects(tools.delete.handler({ tree_id: 't', tipo: 'tree', ref: 'x' }), /tipo debe ser uno de/);
+  assert.deepEqual(calls, [['branch', 'x-branch'], ['leaf', 'x-leaf'], ['intent', T, 'x-intent'], ['tool', T, 'x-tool'], ['test_suite', 'x-test_suite']]);
+  await assert.rejects(tools.delete.handler({ tree_id: T, tipo: 'tree', ref: 'x' }), /tipo debe ser uno de/);
 });
 
 test('ya no existen los create_/update_/delete_ que se juntaron', () => {

@@ -1,5 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { DETAIL_HINT, intentLine, intentsSummary } from './resumen.js';
+import { intentLine } from './resumen.js';
 import { inBatch, ok } from './util.js';
 
 // Esquema de los parámetros de una intención, compartido por crear y actualizar.
@@ -19,21 +19,6 @@ const paramsSchema = {
 
 export function registerIntentTools(client: TreeflowClient) {
   return [
-    {
-      name: 'treeflow_list_intents',
-      description:
-        'Lista las intenciones NLU de un bot: nombre, ID, cuántas frases tiene y sus parámetros. Las frases y la ' +
-        'configuración de los parámetros: treeflow_get_detail con tipo intent.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tree_id: { type: 'string', description: 'ID del bot/árbol' },
-        },
-        required: ['tree_id'],
-      },
-      handler: async (args: { tree_id: string }) =>
-        ok(`${intentsSummary(await client.listIntents(args.tree_id))}\n${DETAIL_HINT}`),
-    },
     {
       name: 'treeflow_create_intent',
       description:

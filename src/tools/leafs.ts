@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { TreeflowClient } from '../client/treeflowClient.js';
-import { DETAIL_HINT, branchOutline, canvasNames, leafLine } from './resumen.js';
+import { canvasNames, leafLine } from './resumen.js';
 import { ok } from './util.js';
 
 export interface NewLeaf {
@@ -67,25 +67,6 @@ async function createLeaves(client: TreeflowClient, branchId: string, leaves: Ne
 
 export function registerLeafTools(client: TreeflowClient) {
   return [
-    {
-      name: 'treeflow_list_leafs',
-      description:
-        'Esquema de las hojas de una rama: una línea por hoja con su tipo, ID, qué dice, qué escucha y a dónde va. ' +
-        'El config completo de una hoja: treeflow_get_detail con tipo leaf.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          branch_id: { type: 'string', description: 'ID de la rama' },
-        },
-        required: ['branch_id'],
-      },
-      handler: async (args: { branch_id: string }) => {
-        const branch = await client.getBranch(args.branch_id);
-        // Los nombres de las plantillas permiten decir con cuál habla cada hoja.
-        const templates = branch?.tree_id ? await client.listMessageTemplates(branch.tree_id).catch(() => []) : [];
-        return ok(`${branchOutline(branch, canvasNames([branch], templates))}\n${DETAIL_HINT}`);
-      },
-    },
     {
       name: 'treeflow_create_leaf',
       description:

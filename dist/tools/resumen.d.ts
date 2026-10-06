@@ -19,13 +19,20 @@ export declare function entitiesSummary(entities: any[]): string;
 export declare function templateLine(template: any): string;
 export declare function templatesSummary(templates: any[]): string;
 export declare function treeHeader(tree: any): string;
+export declare const SECTIONS: readonly ["canvas", "ramas", "intenciones", "entidades", "plantillas"];
+export type Section = (typeof SECTIONS)[number];
+export declare const DEFAULT_SECTIONS: Section[];
+/**
+ * El bot por secciones. canvas = ramas con una línea por hoja; ramas = sólo las ramas. Lo que
+ * no se pide se cuenta al final, para que el modelo sepa que existe y cómo pedirlo.
+ */
 export declare function treeOutline(data: {
     tree: any;
     branches: any[];
     intents: any[];
     entities: any[];
     templates: any[];
-}): string;
+}, sections?: Section[], branchFilter?: string): string;
 export declare const toolLine: (t: any) => string;
 export declare const scriptLine: (s: any) => string;
 export declare function fertilizersSummary(config: any): string;

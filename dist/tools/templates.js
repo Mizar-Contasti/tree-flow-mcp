@@ -1,20 +1,7 @@
-import { DETAIL_HINT, templateLine, templatesSummary } from './resumen.js';
+import { templateLine } from './resumen.js';
 import { ok } from './util.js';
 export function registerTemplateTools(client) {
     return [
-        {
-            name: 'treeflow_list_message_templates',
-            description: 'Lista las plantillas de mensaje de un bot: nombre, ID, el inicio de su texto y qué bloques enriquecidos ' +
-                'usa. Los bloques completos: treeflow_get_detail con tipo template.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    tree_id: { type: 'string', description: 'ID del bot/árbol' },
-                },
-                required: ['tree_id'],
-            },
-            handler: async (args) => ok(`${templatesSummary(await client.listMessageTemplates(args.tree_id))}\n${DETAIL_HINT}`),
-        },
         {
             name: 'treeflow_save_message_template',
             description: 'Crea (sin template_id) o modifica (con template_id) una plantilla de mensaje: un texto de respaldo y, si ' +

@@ -1,4 +1,5 @@
 import { TreeflowClient } from '../client/treeflowClient.js';
+import { Section } from './resumen.js';
 export declare function registerTreeTools(client: TreeflowClient): ({
     name: string;
     description: string;
@@ -6,6 +7,8 @@ export declare function registerTreeTools(client: TreeflowClient): ({
         type: string;
         properties: {
             tree_id?: undefined;
+            secciones?: undefined;
+            rama?: undefined;
             name?: undefined;
             description?: undefined;
             purpose?: undefined;
@@ -35,6 +38,8 @@ export declare function registerTreeTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            secciones?: undefined;
+            rama?: undefined;
             name?: undefined;
             description?: undefined;
             purpose?: undefined;
@@ -50,6 +55,50 @@ export declare function registerTreeTools(client: TreeflowClient): ({
     };
     handler: (args: {
         tree_id: string;
+    }) => Promise<{
+        content: {
+            type: string;
+            text: string;
+        }[];
+    }>;
+} | {
+    name: string;
+    description: string;
+    inputSchema: {
+        type: string;
+        properties: {
+            tree_id: {
+                type: string;
+                description: string;
+            };
+            secciones: {
+                type: string;
+                items: {
+                    type: string;
+                    enum: ("canvas" | "ramas" | "intenciones" | "entidades" | "plantillas")[];
+                };
+            };
+            rama: {
+                type: string;
+                description: string;
+            };
+            name?: undefined;
+            description?: undefined;
+            purpose?: undefined;
+            primary_language?: undefined;
+            webhook_url?: undefined;
+            nlp_mode?: undefined;
+            sentiment_analysis_enabled?: undefined;
+            ml_confidence_threshold?: undefined;
+            fuzzy_confidence_threshold?: undefined;
+            mode?: undefined;
+        };
+        required: string[];
+    };
+    handler: (args: {
+        tree_id: string;
+        secciones?: Section[];
+        rama?: string;
     }) => Promise<{
         content: {
             type: string;
@@ -79,6 +128,8 @@ export declare function registerTreeTools(client: TreeflowClient): ({
                 description: string;
             };
             tree_id?: undefined;
+            secciones?: undefined;
+            rama?: undefined;
             webhook_url?: undefined;
             nlp_mode?: undefined;
             sentiment_analysis_enabled?: undefined;
@@ -145,6 +196,8 @@ export declare function registerTreeTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
+            secciones?: undefined;
+            rama?: undefined;
             primary_language?: undefined;
         };
         required: string[];

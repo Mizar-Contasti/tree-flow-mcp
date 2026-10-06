@@ -47,6 +47,8 @@ export declare class TreeflowClient {
     workspaceId: string;
     constructor();
     listTrees(): Promise<any>;
+    private treesCache?;
+    resolveTreeId(ref: string): Promise<string>;
     getTree(treeId: string): Promise<any>;
     getTreeData(treeId: string): Promise<{
         tree: any;

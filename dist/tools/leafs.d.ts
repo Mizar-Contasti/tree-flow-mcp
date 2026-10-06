@@ -20,37 +20,6 @@ export declare function registerLeafTools(client: TreeflowClient): ({
                 type: string;
                 description: string;
             };
-            leaves?: undefined;
-            leaf_id?: undefined;
-            tree_id?: undefined;
-            name?: undefined;
-            leaf_type?: undefined;
-            config?: undefined;
-            replace_config?: undefined;
-            position_x?: undefined;
-            position_y?: undefined;
-            is_start?: undefined;
-        };
-        required: string[];
-    };
-    handler: (args: {
-        branch_id: string;
-    }) => Promise<{
-        content: {
-            type: string;
-            text: string;
-        }[];
-    }>;
-} | {
-    name: string;
-    description: string;
-    inputSchema: {
-        type: string;
-        properties: {
-            branch_id: {
-                type: string;
-                description: string;
-            };
             leaves: {
                 type: string;
                 description: string;
