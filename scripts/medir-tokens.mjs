@@ -17,11 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// Un error de axios sin atrapar imprime la petición entera, cabecera con la clave incluida.
-process.on('unhandledRejection', (e) => {
-  console.error(`Error: ${e?.response?.status ?? ''} ${e?.message ?? e}`.trim());
-  process.exit(1);
-});
+import './sin-fugas.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);

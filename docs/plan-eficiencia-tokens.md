@@ -247,6 +247,44 @@ intenciones, armar un flujo de tres hojas, entrenar y probar tres mensajes.
 Es una cuenta gruesa: el caché del cliente abarata lo que se repite, y cada sesión es
 distinta. Pero el orden de magnitud explica el reporte original.
 
+## Medición con sesiones reales (6-oct-2026)
+
+`scripts/sesion-real.mjs` le da una tarea a Claude (Sonnet 5.5, esfuerzo medio) con el MCP
+conectado, por el CLI de Claude Code, y registra los tokens de cada llamada a la API. Misma
+tarea, misma cuenta, las dos versiones; el bot de pruebas se devolvió a su estado inicial
+entre corridas.
+
+| Tarea | Versión | Llamadas | Tokens de entrada | Salida | Costo | Tiempo | ¿La resolvió? |
+|---|---|---|---|---|---|---|---|
+| Explorar CECYTECH (solo lectura) | 1.1.0 | 8 | 281,059 | 2,225 | $0.263 | 26 s | **No**: 2 de 3 preguntas |
+| | 1.2.0 | 4 | 101,723 | 1,819 | $0.191 | 17 s | Sí |
+| Construir y probar una opción | 1.1.0 | 10 | 494,392 | 5,040 | $0.359 | 41 s | Sí |
+| | 1.2.0 | 7 | 154,268 | 2,575 | $0.142 | 28 s | Sí |
+
+Lo que enseñaron:
+
+- **Con 1.1.0 la exploración falla.** El cliente cortó `get_tree_data` (426,573 car.),
+  `list_branches` y `list_message_templates` por exceder su tope de tamaño; el modelo simuló
+  mensajes a ciegas, inventó una herramienta que no existe y no pudo describir las ramas.
+- **Con 1.1.0 construir sólo sale bien leyendo todo**: el modelo leyó las ramas completas
+  (41,604 car.) para reescribir la hoja de inicio con sus 23 rutas (4,177 car. de salida).
+  No perdió datos, pero ese es el costo: 3.2× los tokens de entrada y 2× los de salida.
+- **El texto cuesta el doble de lo estimado**: 1.6–1.8 caracteres por token en las
+  respuestas (español, emojis, UUID) y ~2.2 en el catálogo, no 3.5. Las proporciones entre
+  versiones se mantienen; las cifras absolutas de arriba se quedan cortas.
+- **En 1.2.0, el costo fijo pesa la mitad**: cada llamada arranca con ~12,000 tokens
+  (catálogo de 36 herramientas e instrucciones). En explorar fue el 47% de la entrada.
+- **El otro gran peso es `get_tree_data`**: 23,605 tokens en CECYTECH, que se releen en cada
+  llamada siguiente.
+- **Toda sesión empieza con una llamada sólo para `list_trees`**, para traducir el nombre del
+  bot a su ID: una vuelta completa (~14,000 tokens) que no aporta nada más.
+- Con el CLI de Claude Code, una respuesta enorme se corta en vez de entrar a la conversación;
+  en otros clientes puede entrar entera o reventar el contexto. Con 1.2.0 no pasa en ninguno.
+
+Hallazgo del backend: `POST /api/backup/trees/{id}/snapshots/{snapshot_id}/restore` falla con
+una API key (`'User' object has no attribute 'user_id'`), así que `treeflow_restore_snapshot`
+no funciona para quien entra por el MCP.
+
 ## Estado
 
 | Fase | Estado | Resultado |

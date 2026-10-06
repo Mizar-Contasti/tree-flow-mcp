@@ -10,10 +10,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-process.on('unhandledRejection', (e) => {
-  console.error(`FALLO: ${e?.response?.status ?? ''} ${e?.response?.data?.detail ? JSON.stringify(e.response.data.detail) : e?.message ?? e}`);
-  process.exit(1);
-});
+import './sin-fugas.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(ROOT);
