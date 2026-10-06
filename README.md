@@ -39,13 +39,13 @@ Pega el siguiente bloque dentro de `"mcpServers"` (reemplaza `TREEFLOW_API_KEY` 
 
 > **Nota:** Si tu Treeflow está en un servidor o dominio propio (ej. `https://api.midominio.com`), cambia `"TREEFLOW_URL"` por la URL de tu instancia.
 
-Las tres variables son **obligatorias**:
-
 | Variable | Qué es |
 |---|---|
 | `TREEFLOW_URL` | URL base de tu API de Treeflow (sin barra final). Default: `http://localhost:8000` |
-| `TREEFLOW_API_KEY` | La clave `tf_live_...` del Paso 1. El backend deriva de ella tu workspace y tu rol |
-| `TREEFLOW_WORKSPACE_ID` | El slug de tu workspace (el mismo con el que inicias sesión). Debe ser el dueño de la clave |
+| `TREEFLOW_API_KEY` | **Obligatoria.** La clave `tf_live_...` del Paso 1. El backend deriva de ella tu workspace y tu rol |
+| `TREEFLOW_WORKSPACE_ID` | **Obligatoria.** El slug de tu workspace (el mismo con el que inicias sesión). Debe ser el dueño de la clave |
+| `TREEFLOW_TOOLSETS` | Opcional. Qué grupos de herramientas cargar (ver abajo). Vacía: la base, capturas y respaldos |
+| `TREEFLOW_EXPORT_DIR` | Opcional. Dónde guarda `treeflow_export_tree` los JSON. Default: `~/treeflow-exports` |
 
 ---
 
@@ -54,127 +54,138 @@ Cierra y vuelve a abrir Claude Desktop. Verás el icono del martillo 🛠️ ind
 
 ---
 
-## 🛠️ Catálogo Completo de Herramientas (80 Tools)
+## 🪶 Pensado para gastar pocos tokens
 
-A continuación se detalla todo lo que Claude puede realizar en Treeflow agrupado por módulo:
+Cada vez que el modelo llama a una herramienta, el cliente le vuelve a mandar **todo**: el
+catálogo de herramientas, las instrucciones y la conversación entera con cada resultado
+anterior. Por eso este MCP:
 
-### 1. 🤖 Gestión de Bots (Árboles)
-* `treeflow_list_trees`: Lista todos los bots del workspace.
-* `treeflow_get_tree`: Obtiene configuración detallada de un bot específico.
-* `treeflow_get_tree_data`: Obtiene la estructura COMPLETA del bot en un solo llamado (ramas, nodos, intenciones, entidades y plantillas).
-* `treeflow_create_tree`: Crea un nuevo bot con nombre, propósito (hotel, restaurante, clínica, etc.) e idioma principal.
-* `treeflow_update_tree`: Modifica parámetros avanzados de NLP, umbrales de confianza (ML / difuso), análisis de sentimiento y modos de operación.
+- **Resume primero y da el detalle aparte.** `treeflow_get_tree_data` devuelve el esquema
+  del bot en texto (una línea por hoja, intención o entidad, con su ID) y
+  `treeflow_get_detail` da el detalle completo de una sola pieza.
+- **Edita mandando sólo lo que cambia**, sin obligar a leer antes: el `config` de una hoja
+  se combina por claves, y las frases y valores se añaden o quitan con `add_` / `remove_`.
+- **Crea en lote**: varias intenciones, entidades u hojas enlazadas en una llamada.
+- **Responde corto**: las escrituras devuelven una línea con el ID; el entrenamiento espera
+  y devuelve el resultado final.
+- **Carga sólo los grupos de herramientas que hacen falta.**
 
-> El borrado de bots y de usuarios **no** se expone como herramienta: son operaciones destructivas e irreversibles que deben hacerse desde el panel de Treeflow.
+Medido sobre un bot de 148 hojas y 101 intenciones (detalle en
+[`docs/plan-eficiencia-tokens.md`](docs/plan-eficiencia-tokens.md)):
 
-### 2. 🌿 Canvas & Flujos Visuales (Branches & Leafs)
-* `treeflow_list_branches`: Lista todas las ramas de conversación del canvas.
-* `treeflow_create_branch`: Crea una nueva rama y su nodo de inicio.
-* `treeflow_update_branch`: Modifica el nombre o descripción de una rama (sólo requiere `branch_id`).
-* `treeflow_delete_branch`: Elimina una rama y todos sus nodos (sólo requiere `branch_id`).
-* `treeflow_list_leafs`: Lista todos los nodos de una rama seleccionada.
-* `treeflow_create_leaf`: Crea un nodo en el lienzo (`message`, `trigger_context`, `intent`, `action`, `condition`, `webhook`) con su configuración y posición `position_x` / `position_y`.
-* `treeflow_update_leaf`: Modifica el contenido, posición o comportamiento de un nodo.
-* `treeflow_delete_leaf`: Elimina un nodo del canvas.
+| | 1.1.0 | 1.2.0 |
+|---|---|---|
+| Catálogo e instrucciones, en cada llamada | ~14,650 tokens | ~7,100 tokens |
+| `treeflow_get_tree_data` | 426,573 caracteres | 41,347 caracteres |
+| `treeflow_export_tree` | 14.6 M caracteres en la conversación | una ruta a un archivo |
+| `treeflow_simulate_message` | 2,024 caracteres | 490 caracteres |
 
-### 3. 🧠 NLU: Intenciones & Extracción de Parámetros (Slots)
-* `treeflow_list_intents`: Lista las intenciones NLU con sus frases y slots configurados.
-* `treeflow_create_intent`: Crea una intención con frases de entrenamiento y parámetros requeridos (`entity_name`, `required`, `prompt`).
-* `treeflow_update_intent`: Actualiza frases de entrenamiento, nombre o parámetros de una intención.
-* `treeflow_delete_intent`: Elimina una intención.
+### Grupos de herramientas
 
-### 4. 🏷️ NLU: Entidades & Sinónimos
-* `treeflow_list_entities`: Lista todas las entidades del bot.
-* `treeflow_create_entity`: Crea una entidad (`simple` con sinónimos, `composite` o `regex`).
-* `treeflow_update_entity`: Modifica valores canónicos, sinónimos o patrones regex.
-* `treeflow_delete_entity`: Elimina una entidad.
+| Grupo | Por defecto | Qué trae |
+|---|---|---|
+| **base** | siempre | bots, ramas, hojas, intenciones, entidades, plantillas, detalle, borrar, guía, entrenar, simular y conversaciones |
+| **capturas** | sí | las preguntas reutilizables del slot filling |
+| **respaldos** | sí | snapshots, restaurar, exportar e importar |
+| apis | no | las APIs y scripts que el bot ejecuta, sus pruebas y sus logs |
+| pruebas | no | suites de prueba y sus ejecuciones |
+| atencion | no | transferencia a humano y mesa de ayuda (sólo lectura) |
+| historial | no | historial de cambios y de entrenamientos, y analíticas |
+| admin | no | canales, voz, usuarios y credenciales |
 
-### 5. 💬 Respuestas & Plantillas Enriquecidas
-* `treeflow_list_message_templates`: Lista las plantillas de mensaje del bot.
-* `treeflow_create_message_template`: Crea plantillas con texto de respaldo y bloques enriquecidos (tarjetas, botones, carruseles, audios).
-* `treeflow_update_message_template`: Actualiza una plantilla existente.
-* `treeflow_delete_message_template`: Elimina una plantilla.
-
-### 6. 🧪 Herramientas del bot: APIs y Scripts
-Las **herramientas** son lo que el bot puede ejecutar durante una conversación: llamadas a APIs externas y scripts propios. Se guardan con campos planos (`url`, `method`, `body`, `authType`, `inputVariables`, `outputVariables`…). Las variables se escriben `{ $nombre }` en la URL y el cuerpo.
-
-* `treeflow_list_fertilizers`: Lista las APIs, los scripts y el webhook principal. Contraseñas y tokens salen enmascarados (`***`).
-* `treeflow_create_tool` / `treeflow_update_tool` / `treeflow_delete_tool`: Crea, modifica (solo lo que cambia) o elimina una API, por id o nombre.
-* `treeflow_test_tool`: Prueba la API con el **mismo ejecutor que usa la conversación** (llamada real). Devuelve estado `ok` / `sin_datos` / `error`, código HTTP, entradas y salidas extraídas.
-* `treeflow_list_tool_logs`: Historial de ejecuciones, con filtros.
-* `treeflow_create_script` / `treeflow_update_script` / `treeflow_delete_script`: Scripts Python o Node.js (`inputs.get("x")`, resultado en `outputs`).
-* `treeflow_test_script`: Ejecuta un script en caliente: outputs, stdout, stderr y tiempo.
-
-> **Cambio en 1.1.0:** `treeflow_create_fertilizer` y `treeflow_delete_fertilizer` se reemplazan por `treeflow_create_tool` y `treeflow_delete_tool`. La creación anterior guardaba la herramienta como `{ type, config }`, una forma que el motor no ejecuta.
-
-### 6b. 🧩 Capturas (preguntas reutilizables del slot filling)
-* `treeflow_list_captures` / `treeflow_get_capture`: Consulta las capturas del bot.
-* `treeflow_create_capture` / `treeflow_update_capture` / `treeflow_delete_capture`: Gestiona la pregunta, el texto de respaldo, el límite de insistencia y qué hacer al alcanzarlo. Varios parámetros pueden compartir una captura; surte efecto sin reentrenar.
-
-### 6c. 🙋 Transferencia a humano
-* `treeflow_list_transfers` / `treeflow_create_transfer` / `treeflow_update_transfer` / `treeflow_delete_transfer`: Configura la derivación a un asesor (endpoint externo opcional, historial, mensaje al usuario).
-* `treeflow_test_transfer`: Prueba el envío al endpoint configurado.
-
-### 6d. 🧪 Suites de prueba del bot
-* `treeflow_list_test_suites` / `treeflow_get_test_suite` / `treeflow_create_test_suite` / `treeflow_update_test_suite` / `treeflow_delete_test_suite`: Conversaciones guiadas con comprobaciones (`intencion`, `respuesta_contiene`, `parametro`, `slot`, `evento`).
-* `treeflow_import_test_suite_csv` / `treeflow_export_test_suite_csv`: Casos desde y hacia CSV.
-* `treeflow_run_test_suite`: Ejecuta la suite completa y devuelve el resultado.
-* `treeflow_list_test_runs` / `treeflow_get_test_run` / `treeflow_compare_test_runs`: Historial de ejecuciones y detección de regresiones entre dos de ellas.
-
-### 6e. 🎧 Mesa de ayuda (solo lectura)
-* `treeflow_get_live_chat_queue`: Conversaciones esperando o en atención.
-* `treeflow_get_live_chat_history`: Historial de atenciones, con filtros.
-* `treeflow_get_live_chat_session`: Detalle y turnos de una atención.
-
-> Tomar, responder o cerrar una atención **no** se expone: es hablar con un cliente real en nombre de una persona, y se hace desde la mesa de ayuda de Treeflow.
-
-### 7. 🔌 Canales & Integraciones (Injertos)
-* `treeflow_list_integrations`: Consulta el estado de los canales (WhatsApp, Webchat, Telegram, Webhooks).
-* `treeflow_configure_integration`: Activa, desactiva o ajusta credenciales de canales de mensajería.
-
-### 8. 🎙️ Configuración de Voz (STT / TTS)
-* `treeflow_get_voice_config`: Consulta el estado de Speech-To-Text (Whisper) y Text-To-Speech (Piper), voz y velocidad.
-* `treeflow_update_voice_config`: Configura modelos de audio, idioma, voces y velocidad de reproducción.
-
-### 9. 📈 Entrenamiento & Historial de Machine Learning
-* `treeflow_trigger_training`: Dispara el re-entrenamiento del modelo NLU de Machine Learning.
-* `treeflow_get_training_status`: Consulta el estado en vivo del entrenamiento.
-* `treeflow_list_training_history`: Historial completo de entrenamientos con métricas y logs de error.
-
-### 10. 💬 Simulación, Conversaciones & Diagnóstico
-* `treeflow_simulate_message`: Envía un mensaje de prueba al bot y recibe la intención detectada, score, entidades extraídas, respuesta y transición de nodos.
-* `treeflow_list_conversations`: Lista las conversaciones recientes registradas en el bot.
-* `treeflow_get_conversation`: Obtiene todos los turnos y mensajes detallados de una sesión.
-
-### 11. 🛡️ Auditoría & Respaldos (Backups)
-* `treeflow_list_change_history`: Historial de auditoría para saber qué usuario modificó qué elemento y cuándo.
-* `treeflow_list_backups`: Lista los snapshots de seguridad del bot.
-* `treeflow_create_backup`: Crea un snapshot completo antes de realizar cambios importantes.
-* `treeflow_restore_snapshot`: Restaura el bot a un snapshot, **sobrescribiendo el estado actual**. Exige `confirm: true` y crea antes un snapshot de seguridad.
-* `treeflow_export_tree`: Exporta el bot completo (con scripts y herramientas) como JSON; las conversaciones son opcionales.
-* `treeflow_import_tree`: Crea un bot **nuevo** desde un export, sin tocar los existentes.
-* `treeflow_get_conversation_analytics`: Métricas de conversaciones: intenciones, fallback, retención y árbol de flujo.
-
-### 12. 👥 Usuarios & Credenciales del Workspace
-* `treeflow_list_users`: Lista los miembros y roles del workspace.
-* `treeflow_create_user`: Invita un nuevo usuario al workspace.
-* `treeflow_update_user`: Modifica rol o estado de un usuario.
-* `treeflow_list_credentials`: Verifica proveedores de IA activos (OpenAI, Gemini, Groq, Twilio, Meta).
+- `"TREEFLOW_TOOLSETS": "apis,pruebas"` carga la base más esos grupos (sustituye a los de
+  por defecto: si los quieres también, nómbralos).
+- `"TREEFLOW_TOOLSETS": "todo"` carga las 67 herramientas.
+- A mitad de una conversación, el modelo puede activar un grupo con
+  `treeflow_enable_tools`. El servidor avisa al cliente (`tools/list_changed`); si tu
+  cliente no recarga la lista, añade el grupo a la variable y reinícialo.
 
 ---
 
-## 💬 Ejemplos de lo que puedes pedirle a Claude
+## 🛠️ Herramientas
 
-* *"Hazme un resumen completo del bot 'Soporte Comercial' usando `treeflow_get_tree_data`."*
-* *"Crea una intención 'consultar_disponibilidad' con 6 frases de entrenamiento y un parámetro 'fecha' de tipo @sys.date."*
-* *"Crea una rama llamada 'Flujo_Reservas', agrégale un nodo de mensaje y conéctalo al canvas."*
-* *"Activa la integración de WhatsApp y configura la voz TTS en español con velocidad 1.1."*
-* *"Simula una conversación enviando 'Hola quiero cancelar mi pedido' y dime qué intención detectó el bot."*
-* *"Crea un respaldo de seguridad del bot antes de que empecemos a modificar los flujos."*
+### Base
+* `treeflow_list_trees` / `treeflow_get_tree` / `treeflow_create_tree` / `treeflow_update_tree`: los bots del workspace.
+* `treeflow_get_tree_data`: el esquema de todo el bot en una llamada.
+* `treeflow_get_detail(tipo, ref)`: el detalle de una hoja, intención, entidad, plantilla, API o script, por ID o nombre.
+* `treeflow_list_branches` / `treeflow_create_branch` / `treeflow_update_branch`: las ramas (flujos) del canvas. Una rama nueva trae su hoja Start.
+* `treeflow_list_leafs` / `treeflow_create_leaf` / `treeflow_update_leaf`: las hojas. `create_leaf` recibe una lista y las enlaza entre sí con `"ref:<ref>"`; `update_leaf` combina el config (una clave en `null` se borra).
+* `treeflow_list_intents` / `treeflow_create_intent` / `treeflow_update_intent`: intenciones NLU. `create_intent` recibe una lista; `update_intent` acepta `add_patterns` / `remove_patterns`.
+* `treeflow_list_entities` / `treeflow_create_entity` / `treeflow_update_entity`: entidades. Igual, con `add_values` / `remove_values`.
+* `treeflow_list_message_templates` / `treeflow_save_message_template`: plantillas de mensaje.
+* `treeflow_delete(tipo, ref)`: borra una rama, hoja, intención, entidad, plantilla, API, script, captura, transferencia o suite.
+* `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine) y consultar el estado.
+* `treeflow_simulate_message` / `treeflow_list_conversations` / `treeflow_get_conversation`: probar el bot y leer conversaciones.
+* `treeflow_guide(tema)`: referencia de plantillas, APIs, scripts, hojas, capturas y suites.
+
+### Capturas
+* `treeflow_list_captures` / `treeflow_get_capture` / `treeflow_save_capture`.
+
+### Respaldos
+* `treeflow_list_backups` / `treeflow_create_backup`: snapshots del bot.
+* `treeflow_restore_snapshot`: restaura un snapshot **sobrescribiendo el estado actual**; exige `confirm: true` y crea antes un snapshot de seguridad.
+* `treeflow_export_tree`: guarda el bot completo en un JSON local y devuelve la ruta. `treeflow_import_tree`: crea un bot **nuevo** desde ese archivo.
+
+### apis
+* `treeflow_list_fertilizers`: el webhook principal, las APIs y los scripts.
+* `treeflow_save_tool` / `treeflow_test_tool`: crear o modificar una API y probarla con el mismo ejecutor de la conversación.
+* `treeflow_save_script` / `treeflow_test_script`: scripts Python o Node.js.
+* `treeflow_list_tool_logs`: historial de ejecuciones.
+
+### pruebas
+* `treeflow_list_test_suites` / `treeflow_get_test_suite` / `treeflow_save_test_suite`, `treeflow_import_test_suite_csv` / `treeflow_export_test_suite_csv`.
+* `treeflow_run_test_suite`: corre la suite y devuelve los totales y sólo lo que falló.
+* `treeflow_list_test_runs` / `treeflow_get_test_run` / `treeflow_compare_test_runs`.
+
+### atencion
+* `treeflow_list_transfers` / `treeflow_save_transfer` / `treeflow_test_transfer`: transferencia a un asesor.
+* `treeflow_get_live_chat_queue` / `treeflow_get_live_chat_history` / `treeflow_get_live_chat_session`: la mesa de ayuda, sólo lectura.
+
+### historial
+* `treeflow_list_change_history` (con `change_id`, el antes/después de un cambio), `treeflow_list_training_history`, `treeflow_get_conversation_analytics`.
+
+### admin
+* `treeflow_list_integrations` / `treeflow_configure_integration`: canales. El token de Telegram se conecta desde el panel.
+* `treeflow_get_voice_config` / `treeflow_update_voice_config`.
+* `treeflow_list_users` / `treeflow_create_user` / `treeflow_update_user` / `treeflow_list_credentials`.
+
+> El borrado de bots y de usuarios **no** se expone: son operaciones irreversibles que se hacen desde el panel de Treeflow. Tampoco se puede tomar, responder ni cerrar una atención de la mesa de ayuda.
 
 ---
 
-## 🧪 Desarrollo: validación de rutas
+## 🔁 Cambios de la 1.2.0 que rompen con la 1.1.0
+
+| Antes | Ahora |
+|---|---|
+| `create_tool` + `update_tool` (y lo mismo con script, capture, transfer, message_template, test_suite) | `save_tool` y compañía: sin ID crean, con ID modifican |
+| `delete_branch`, `delete_leaf`, `delete_intent`… (10 herramientas) | `treeflow_delete(tree_id, tipo, ref)` |
+| `create_leaf` con una hoja | `create_leaf` con `leaves: [...]` |
+| `create_intent` / `create_entity` con una pieza | con `intents: [...]` / `entities: [...]` |
+| `update_leaf` sustituía el `config` entero | lo combina con el guardado; necesita `branch_id` o `tree_id` (o `replace_config: true`) |
+| `get_tree_data` y los `list_*` devolvían JSON completo | resúmenes en texto; el detalle con `get_detail` |
+| `export_tree` devolvía el JSON en la conversación | lo guarda en un archivo; `import_tree` acepta `archivo` |
+| `trigger_training` volvía al instante | espera a que termine, y fuerza por defecto |
+| las 80 herramientas siempre cargadas | grupos: ver `TREEFLOW_TOOLSETS` |
+
+---
+
+## 🧪 Desarrollo
+
+```sh
+npm install
+npm test                 # compila y corre las pruebas (sin red)
+npm run medir            # cuánto pesa el catálogo; con --arbol "Nombre" mide también las lecturas
+node scripts/e2e-dev.mjs # de punta a punta contra un backend real, sobre un bot de pruebas propio
+```
+
+`npm run medir -- --arbol` y `scripts/e2e-dev.mjs` leen la conexión de las variables de
+entorno o de un `.env` en la raíz del repo (está en `.gitignore`). El de punta a punta crea
+o reutiliza el bot "MCP pruebas (Claude)" y no toca ningún otro.
+
+**El `dist/` va en el repo**: `npx github:…` ejecuta lo que hay commiteado, sin compilar.
+Después de cambiar `src/`, corre `npm run build` y commitea `dist/` junto con el cambio.
+
+### Validación de rutas
 
 Cada llamada del cliente HTTP se valida contra el `openapi.json` real del backend, para que
 ninguna herramienta apunte a una ruta inexistente:

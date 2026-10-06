@@ -6,8 +6,12 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { createRequire } from 'node:module';
 import { TreeflowClient } from './client/treeflowClient.js';
 import { TOOLSETS, buildInstructions, buildTools, enableToolsTool, parseToolsets, toolsetOf } from './catalog.js';
+
+// La versión sale del package.json, para no tener que acordarse de cambiarla en dos sitios.
+const { version } = createRequire(import.meta.url)('../package.json');
 
 async function main() {
   const client = new TreeflowClient();
@@ -21,7 +25,7 @@ async function main() {
   const server = new Server(
     {
       name: 'treeflow-mcp',
-      version: '1.1.0',
+      version,
     },
     {
       capabilities: {

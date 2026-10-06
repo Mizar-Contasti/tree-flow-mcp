@@ -212,11 +212,40 @@ documenta un formato de bloques: remite a copiar el de una plantilla existente. 
 comprobar cómo se ve en un canal una plantilla creada por el MCP.
 
 ### Fase 6 — Cierre
-- [ ] README con los cambios de nombres y de comportamiento.
-- [ ] Versión 1.2.0.
-- [ ] Medición final contra la línea base y prueba completa en dev.
+- [x] README con los grupos, los cambios que rompen con 1.1.0 y cómo probar.
+- [x] Versión 1.2.0; el servidor la lee del `package.json`.
+- [x] Medición final contra la línea base y prueba completa en dev: 59 pruebas, 76 rutas
+      válidas, 13 comprobaciones de punta a punta contra el backend real.
 - [ ] Push a `main`, **sólo con el visto bueno de Mizar**: cambia el MCP de dev y de prod
       en el siguiente reinicio de Claude Desktop.
+
+## Resultado
+
+| | 1.1.0 | 1.2.0 |
+|---|---|---|
+| Catálogo + instrucciones, en cada llamada | 80 herr., ~14,650 tok | 36 herr. por defecto, ~7,100 tok |
+| `export_tree` | 14,645,991 car. | 363 car. (la ruta del archivo) |
+| `get_tree_data` | 426,573 car. | 41,347 car. |
+| `list_training_history` | 304,110 | 1,075 |
+| `list_fertilizers` | 295,001 | 2,438 |
+| `list_change_history` | 179,737 | 2,587 |
+| `list_branches` | 161,696 | 1,143 |
+| `list_message_templates` | 108,381 | 8,863 |
+| `list_intents` | 96,167 | 7,795 |
+| `simulate_message` | 2,024 | 490 |
+| Escrituras | el objeto completo | una línea, 90–400 car. |
+
+Estimación de una sesión típica sobre el bot de referencia: explorar, crear dos
+intenciones, armar un flujo de tres hojas, entrenar y probar tres mensajes.
+
+- **1.1.0**: 16 llamadas (una por pieza, más consultas del entrenamiento); desde la
+  segunda, cada una carga el catálogo y los ~122,000 tokens del árbol. Del orden de
+  **2 millones** de tokens de entrada.
+- **1.2.0**: 9 llamadas (lotes y entrenamiento que espera), cada una con ~7,100 de catálogo
+  y ~11,800 del esquema. Del orden de **160,000**.
+
+Es una cuenta gruesa: el caché del cliente abarata lo que se repite, y cada sesión es
+distinta. Pero el orden de magnitud explica el reporte original.
 
 ## Estado
 
@@ -228,4 +257,4 @@ comprobar cómo se ve en un canal una plantilla creada por el MCP.
 | 3 | hecha | Escrituras de 350–850 a 90–230 car.; `simulate_message` 2,024 → 490; `list_trees` 3,691 → 444 |
 | 4 | hecha | Un flujo de 3 hojas enlazadas en 1 llamada; entrenar en 1 llamada en vez de 1 + N consultas |
 | 5 | hecha | Por llamada: ~14,650 → ~7,100 tokens (36 de 67 herramientas por defecto) |
-| 6 | pendiente | |
+| 6 | lista salvo el push | Espera el visto bueno para subir a `main` |

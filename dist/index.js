@@ -2,8 +2,11 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
+import { createRequire } from 'node:module';
 import { TreeflowClient } from './client/treeflowClient.js';
 import { TOOLSETS, buildInstructions, buildTools, enableToolsTool, parseToolsets, toolsetOf } from './catalog.js';
+// La versión sale del package.json, para no tener que acordarse de cambiarla en dos sitios.
+const { version } = createRequire(import.meta.url)('../package.json');
 async function main() {
     const client = new TreeflowClient();
     // Grupos activos: la base siempre, más los de TREEFLOW_TOOLSETS (o los de por defecto).
@@ -13,7 +16,7 @@ async function main() {
     }
     const server = new Server({
         name: 'treeflow-mcp',
-        version: '1.1.0',
+        version,
     }, {
         capabilities: {
             tools: { listChanged: true },
