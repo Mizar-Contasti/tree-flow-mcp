@@ -186,7 +186,12 @@ posteriores al último entrenamiento, y durante las 6 horas siguientes a cualqui
 entrenamiento ningún cambio lo parece: el estado dice "updated" y `POST /train` sin
 `force` **se salta el entrenamiento** aunque haya intenciones nuevas. Medido en dev:
 último entrenamiento `23:47:08`, último cambio `17:47:31` del mismo día, 23 s después en
-tiempo real. Falta comprobar la zona horaria de la base de producción.
+tiempo real.
+
+**Resuelto.** El backend compara las dos fechas en UTC desde treeflow `41326ce8`, y la base
+de producción está en `UTC` (comprobado el 14-oct-2026; ver `pendientes/reloj-utc.md` en
+treeflow). `trigger_training` ya no fuerza por defecto: forzar reentrenaba el mismo modelo
+en cada llamada. Sin cambios contesta que el modelo está al día y, con `probar`, prueba igual.
 
 ### Fase 5 — Catálogo más liviano
 - [x] Juntar `create_X`/`update_X` donde repetían esquema (36% del catálogo): `save_tool`,

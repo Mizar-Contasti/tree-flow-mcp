@@ -115,7 +115,7 @@ Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
 * `treeflow_create_entity` / `treeflow_update_entity`: entidades. Igual, con `add_values` / `remove_values`.
 * `treeflow_save_message_template`: plantillas de mensaje: un texto, o bloques enriquecidos (botones, tarjetas…) dentro de un `payload`.
 * `treeflow_delete(tipo, ref)`: borra una rama, hoja, intención, entidad, plantilla, API, script, captura, transferencia o suite.
-* `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine; con `probar`, prueba mensajes al terminar) y consultar el estado.
+* `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine; con `probar`, prueba mensajes al terminar) y consultar el estado. Si no hubo cambios desde el último entrenamiento no reentrena; `force: true` lo fuerza.
 * `treeflow_simulate_message`: probar el bot, siguiendo una conversación con su `session_id`.
 * `treeflow_guide(tema)`: referencia de plantillas, bloques enriquecidos, APIs, scripts, hojas, capturas y suites.
 

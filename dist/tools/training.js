@@ -12,35 +12,40 @@ export function registerTrainingTools(client) {
                 properties: {
                     tree_id: { type: 'string', description: 'ID o nombre del bot' },
                     probar: { type: 'array', items: { type: 'string' }, description: 'Mensajes de prueba tras entrenar' },
-                    force: { type: 'boolean', description: 'Default true. Con false, el backend no entrena si cree que no hubo cambios' },
+                    force: { type: 'boolean', description: 'Default false: si no hubo cambios desde el último entrenamiento, el backend no reentrena. Con true entrena igual' },
                     esperar_segundos: { type: 'integer', description: 'Máximo a esperar (default 90)' },
                 },
                 required: ['tree_id'],
             },
             handler: async (args) => {
                 const r = await client.trainAndWait(args.tree_id, {
-                    // Forzado por defecto: el backend decide "sin cambios" comparando la fecha del
-                    // último entrenamiento (UTC) con la de los cambios (hora local), y durante horas
-                    // se salta entrenamientos con intenciones nuevas. Repetir uno cuesta segundos;
-                    // saltarse uno deja los cambios sin efecto y sin aviso.
-                    force: args.force ?? true,
+                    // Sin forzar por defecto. Se forzaba porque el backend comparaba la fecha del
+                    // último entrenamiento (UTC) con la de los cambios (hora local) y se saltaba
+                    // entrenamientos con intenciones nuevas. Desde treeflow 41326ce8 compara las dos
+                    // en UTC, y producción está en UTC (comprobado el 14-oct-2026), así que "sin
+                    // cambios" es fiable. Forzar reentrenaba el mismo modelo en cada llamada: CPU de
+                    // la Raspberry Pi de producción para nada.
+                    force: args.force ?? false,
                     timeoutMs: Math.min(Math.max(args.esperar_segundos ?? 90, 5), 600) * 1000,
                 });
-                if (r.outcome === 'skipped') {
-                    return ok(`El backend no vio cambios y no entrenó (pediste force=false). can_use: ${r.status?.can_use}.`);
-                }
                 if (r.outcome === 'running') {
                     return ok(`Sigue entrenando después de ${Math.round(r.seconds)} s. Consulta treeflow_get_training_status más tarde.`);
                 }
                 const s = r.status ?? {};
-                const summary = r.last?.changes_summary ?? {};
-                const parts = [`Entrenamiento ${s.status === 'error' ? 'FALLIDO' : 'terminado'} en ${Math.round(r.seconds)} s`, `estado ${s.status}`, `can_use ${s.can_use}`];
-                if (summary.intents_total !== undefined)
-                    parts.push(`${summary.intents_total} intenciones, ${summary.entities_total ?? '?'} entidades`);
-                if (r.last?.error_message)
-                    parts.push(`error${r.last.error_phase ? ` en ${r.last.error_phase}` : ''}: ${clip(r.last.error_message, 200)}`);
-                const lines = [parts.join(' · ')];
-                // Probar sólo tiene sentido con un modelo listo.
+                const lines = [];
+                if (r.outcome === 'skipped') {
+                    lines.push(`Sin cambios desde el último entrenamiento: el backend no reentrenó, el modelo ya está al día (can_use ${s.can_use}). Con force=true entrena igual.`);
+                }
+                else {
+                    const summary = r.last?.changes_summary ?? {};
+                    const parts = [`Entrenamiento ${s.status === 'error' ? 'FALLIDO' : 'terminado'} en ${Math.round(r.seconds)} s`, `estado ${s.status}`, `can_use ${s.can_use}`];
+                    if (summary.intents_total !== undefined)
+                        parts.push(`${summary.intents_total} intenciones, ${summary.entities_total ?? '?'} entidades`);
+                    if (r.last?.error_message)
+                        parts.push(`error${r.last.error_phase ? ` en ${r.last.error_phase}` : ''}: ${clip(r.last.error_message, 200)}`);
+                    lines.push(parts.join(' · '));
+                }
+                // Probar sólo tiene sentido con un modelo listo; sin cambios, el que hay lo está.
                 if (args.probar?.length && s.can_use) {
                     lines.push('Pruebas (cada una en una conversación nueva):');
                     for (const message of args.probar) {

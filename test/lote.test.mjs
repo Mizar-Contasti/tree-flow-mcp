@@ -106,16 +106,28 @@ test('trigger_training espera a que termine y devuelve el resultado', async () =
   }
 });
 
-test('trigger_training fuerza por defecto; con force=false el backend puede saltárselo y se dice', async () => {
+test('trigger_training no fuerza por defecto: sin cambios el backend no reentrena y se dice; con force=true sí', async () => {
   let forced;
   const tools = herramientas(clienteFalso({
     triggerTraining: async (_, force) => ((forced = force), { status: force ? 'queued' : 'skipped' }),
     getTrainingStatus: async () => ({ status: 'updated', can_use: true }),
     listTrainingHistory: async () => ({ items: [] }),
   }));
-  await tools.trigger_training.handler({ tree_id: fx.TREE_ID });
+  const out = texto(await tools.trigger_training.handler({ tree_id: fx.TREE_ID }));
+  assert.equal(forced, false);
+  assert.match(out, /^Sin cambios desde el último entrenamiento: el backend no reentrenó, el modelo ya está al día \(can_use true\)/);
+  await tools.trigger_training.handler({ tree_id: fx.TREE_ID, force: true });
   assert.equal(forced, true);
-  assert.match(texto(await tools.trigger_training.handler({ tree_id: fx.TREE_ID, force: false })), /^El backend no vio cambios y no entrenó/);
+});
+
+test('trigger_training sin cambios igual corre las pruebas: el modelo que hay está al día', async () => {
+  const tools = herramientas(clienteFalso({
+    triggerTraining: async () => ({ status: 'skipped' }),
+    getTrainingStatus: async () => ({ status: 'updated', can_use: true }),
+    simulateChatMessage: async () => ({ intent: 'saludo', confidence: 0.95, response: { type: 'text', value: 'Hola' } }),
+  }));
+  const out = texto(await tools.trigger_training.handler({ tree_id: fx.TREE_ID, probar: ['hola'] }));
+  assert.match(out, /^Sin cambios desde el último entrenamiento.*\nPruebas \(cada una en una conversación nueva\):\n- "hola" → intención saludo \(0\.95\)/);
 });
 
 test('trigger_training que falla trae el error del historial', async () => {
