@@ -189,8 +189,8 @@ entrenamiento ningún cambio lo parece: el estado dice "updated" y `POST /train`
 tiempo real.
 
 **Resuelto.** El backend compara las dos fechas en UTC desde treeflow `41326ce8`, y la base
-de producción está en `UTC` (comprobado el 14-oct-2026; ver `pendientes/reloj-utc.md` en
-treeflow). `trigger_training` ya no fuerza por defecto: forzar reentrenaba el mismo modelo
+de producción está en `UTC` (comprobado el 14-oct-2026; el documento se cerró y sigue en el
+historial de treeflow: `git show 5de5f915^:pendientes/reloj-utc.md`). `trigger_training` ya no fuerza por defecto: forzar reentrenaba el mismo modelo
 en cada llamada. Sin cambios contesta que el modelo está al día y, con `probar`, prueba igual.
 
 ### Fase 5 — Catálogo más liviano
