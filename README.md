@@ -192,7 +192,7 @@ Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
 
 ## ✨ Novedades de la 1.4.0 (sobre la 1.3.1)
 
-Sincroniza el MCP con Treeflow 0.11.58 (condiciones, SQL, ambientes y el elemento «Nuevo mensaje»). No rompe nada de la 1.3.x.
+Sincroniza el MCP con Treeflow 0.11.58 (condiciones, SQL, ambientes y el elemento «Separador»). No rompe nada de la 1.3.x.
 
 | Nuevo | Qué es |
 |---|---|
@@ -213,7 +213,7 @@ También en la 1.4.0 (resto de lo que cambió en Treeflow 0.10.x–0.11.x):
 | variables de script | tipo `auto` (el valor tal cual llega) |
 | `treeflow_update_tree` | `nlp_mode` es `basic` o `pro` (pro sólo Enterprise: otro plan recibe 403) |
 | `treeflow_trigger_training` | si sigue esperando turno dice que está en la cola |
-| bloque `message_break` | «Nuevo mensaje» en las respuestas enriquecidas: lo que va después sale en otra burbuja/mensaje (Treeflow 0.11.58) |
+| bloque `message_break` | «Separador» en las respuestas enriquecidas: lo que va después sale en otra burbuja/mensaje (Treeflow 0.11.58) |
 | guías | `treeflow_guide("sql")`, y más en `condiciones`, `hojas`, `scripts` y `plantillas` (límites, true/false, errores 422) |
 | descripciones | transferencias (Telegram, webhook con adjuntos e `injected_context`), restaurar snapshot (qué restaura y qué conserva), regex de entidades |
 

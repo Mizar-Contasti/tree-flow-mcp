@@ -40,7 +40,7 @@ Bloque: { type, items: [...] } (align "vertical" u "horizontal", default vertica
   accordion   items [{ title, content }]
   dropdown    items [{ label, value }], placeholder, buttonLabel, actionType postback|text
   location    items [{ lat, long, title? }] · html  items [{ html }] · divider  items [] (una línea, mismo mensaje)
-  message_break  items [] — «Nuevo mensaje»: lo que va después sale en otra burbuja (otro mensaje en
+  message_break  items [] — «Separador»: lo que va después sale en otra burbuja (otro mensaje en
               WhatsApp, Telegram…). Úsalo para no pegar un html y el párrafo que lo sigue.
 Ej.: [{ "type": "payload", "value": [{ "type": "paragraph", "items": [{ "text": "¿Qué deseas?" }] },
   { "type": "buttons", "items": [{ "label": "Ver menú", "type": "text", "payload": "ver menú" }] }] }]

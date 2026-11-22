@@ -158,7 +158,7 @@ export function normalizeIntentParams(params, entities = []) {
 export const RICH_BLOCK_TYPES = [
     'paragraph', 'image', 'video', 'audio', 'file', 'buttons', 'quick_replies',
     'accordion', 'dropdown', 'location', 'divider', 'card', 'carousel', 'html',
-    // «Nuevo mensaje»: lo que va después sale en otra burbuja (otro mensaje en los canales).
+    // «Separador»: lo que va después sale en otra burbuja (otro mensaje en los canales).
     'message_break',
 ];
 const RICH_BLOCKS = new Set(RICH_BLOCK_TYPES);
