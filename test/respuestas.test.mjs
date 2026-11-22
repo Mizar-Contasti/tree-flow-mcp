@@ -93,3 +93,35 @@ test('list_conversations pide 20 por defecto', async () => {
   await tool.handler({ tree_id: fx.TREE_ID });
   assert.equal(params.limit, 20);
 });
+
+test('simulate_message: por qué casó (match_detail) y por qué ganó un empate', () => {
+  const entidad = simulationSummary({
+    intent: 'confirmar', confidence: 1, matching_type: 'exact_entity_match', response: { type: 'text', value: 'Listo' },
+    match_detail: { strategy: 'exact_entity', entities: [{ entity: 'afirmacion', kind: 'synonym', value: 'sí', key: 'si',
+      synonym: 'desarrollo', word: 'desarrollo', match: 'exact', ratio: 100, pattern: '@afirmacion' }] },
+  });
+  assert.match(entidad, /por qué: entidad afirmacion: "desarrollo" → valor sí, en el patrón "@afirmacion"/);
+
+  const patron = simulationSummary({
+    intent: 'consulta_de_planes1', response: { type: 'text', value: 'Planes' },
+    match_detail: { strategy: 'exact_pattern', pattern: 'planes wordpress', tie: { with: ['consulta_de_planes2'],
+      runner_up: 'consulta_de_planes2', reason: 'longest_pattern', runner_up_pattern: 'planes' } },
+  });
+  assert.match(patron, /por qué: patrón "planes wordpress"/);
+  assert.match(patron, /empató con consulta_de_planes2; ganó por el patrón más largo \(el de consulta_de_planes2 era "planes"\)/);
+
+  const ml = simulationSummary({ intent: 'horarios', response: { type: 'text', value: 'x' },
+    match_detail: { strategy: 'ml', ml: { confidence: 0.81, threshold: 0.5, runner_up: { intent: 'ubicacion', confidence: 0.14 } } } });
+  assert.match(ml, /por qué: clasificador ML 81% \(umbral 50%\); segunda: ubicacion 14%/);
+
+  const difusa = simulationSummary({ intent: 'pedir', response: { type: 'text', value: 'x' },
+    match_detail: { strategy: 'fuzzy_entity', entities: [{ entity: 'producto', synonym: 'hamburguesa', word: 'hamburgesa',
+      value: 'hamburguesa', match: 'fuzzy', ratio: 95.2 }] } });
+  assert.match(difusa, /por qué: entidad producto: "hamburgesa" se parece 95% a "hamburguesa"/);
+
+  const slot = simulationSummary({ intent: 'reservar', response: { type: 'text', value: 'x' },
+    match_detail: { strategy: 'slot_filling', slot: { parameter: 'zona', entity: 'zona', value: 'terraza', word: 'terraza', match: 'exact' } } });
+  assert.match(slot, /por qué: llenó zona con "terraza" \(entidad zona\)/);
+
+  assert.ok(!simulationSummary({ intent: 'x', response: { type: 'text', value: 'x' } }).includes('por qué'));
+});

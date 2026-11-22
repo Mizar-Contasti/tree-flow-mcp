@@ -272,6 +272,71 @@ function executionLines(r) {
         ...(transfer ? [`transferencia a humano (${transfer.destino ?? '?'}) desde ${transfer.nodo ?? '?'}${transfer.error ? ` · error: ${clip(transfer.error, 100)}` : ''}`] : []),
     ];
 }
+const pct = (v, scale = 1) => (typeof v === 'number' ? `${Math.round(v * scale)}%` : '?');
+const MOTIVOS = {
+    strategy_priority: (t) => `ganó porque su tipo de coincidencia va antes en el orden de detección (el de ${t.runner_up} era ${t.runner_up_strategy ?? '?'})`,
+    more_entities: (t) => `ganó porque encontró más entidades (${t.counts?.winner?.[0] ?? '?'} frente a ${t.counts?.runner_up?.[0] ?? '?'})`,
+    entity_coverage: (t) => `ganó porque apareció una parte mayor de sus entidades (${t.counts?.winner?.join('/') ?? '?'} frente a ${t.counts?.runner_up?.join('/') ?? '?'})`,
+    fewer_missing_parameters: () => 'ganó porque le quedan menos parámetros sin valor',
+    longest_pattern: (t) => `ganó por el patrón más largo${t.runner_up_pattern ? ` (el de ${t.runner_up} era "${clip(t.runner_up_pattern, 50)}")` : ''}`,
+    order: () => 'ganó porque va antes en el orden de las intenciones del nodo',
+};
+/** Una entidad del detalle: qué palabra del mensaje casó, con qué sinónimo y de qué valor. */
+function entityWhy(e) {
+    const word = clip(e.word ?? e.synonym ?? '?', 40);
+    const value = clip(e.value ?? e.key ?? '', 40);
+    let what;
+    if (e.kind === 'system')
+        what = `entidad de sistema ${e.entity}: "${word}"${value && value !== word ? ` = ${value}` : ''}`;
+    else if (e.kind === 'regex')
+        what = `entidad ${e.entity} (regex): "${word}"`;
+    else if (e.match === 'fuzzy')
+        what = `entidad ${e.entity}: "${word}" se parece ${pct(e.ratio)} a "${clip(e.synonym ?? value, 40)}"${value ? ` (valor ${value})` : ''}`;
+    else
+        what = `entidad ${e.entity}: "${word}"${e.synonym && e.synonym !== word ? ` (sinónimo "${clip(e.synonym, 40)}")` : ''}${value ? ` → valor ${value}` : ''}`;
+    return e.pattern ? `${what}, en el patrón "${clip(e.pattern, 60)}"` : what;
+}
+/** `match_detail` de Treeflow (backend/core/detector/detalle_coincidencia.py): por qué casó la intención y, si empató,
+ * por qué ganó. Un Treeflow que no lo manda no añade nada. */
+export function matchWhy(d) {
+    if (!d || typeof d !== 'object' || !d.strategy)
+        return [];
+    const ents = Array.isArray(d.entities) ? d.entities : [];
+    let why = '';
+    switch (d.strategy) {
+        case 'exact_entity':
+        case 'fuzzy_entity':
+            why = ents.map(entityWhy).join('; ');
+            break;
+        case 'exact_pattern':
+        case 'fuzzy_pattern':
+            why = `patrón "${clip(d.pattern, 80)}"${d.strategy === 'fuzzy_pattern' ? ` (parecido ${pct(d.ratio)})` : ''}`;
+            if (d.masked_text)
+                why += ` sobre "${clip(d.masked_text, 80)}"`;
+            if (ents.length)
+                why += ` con ${ents.map((e) => `@${e.entity}="${clip(e.word ?? e.key, 30)}"`).join(', ')}`;
+            break;
+        case 'ml':
+            why = `clasificador ML ${pct(d.ml?.confidence, 100)} (umbral ${pct(d.ml?.threshold, 100)})`;
+            if (d.ml?.runner_up?.intent)
+                why += `; segunda: ${d.ml.runner_up.intent} ${pct(d.ml.runner_up.confidence, 100)}`;
+            break;
+        case 'slot_filling': {
+            const s = d.slot ?? {};
+            why = `llenó ${s.parameter ?? '?'} con "${clip(s.word, 40)}"${s.value && s.value !== s.word ? ` → ${clip(s.value, 40)}` : ''} (entidad ${s.entity ?? '?'}${s.match === 'fuzzy' ? `, parecido ${pct(s.ratio)}` : ''})`;
+            break;
+        }
+        default:
+            return [];
+    }
+    const lines = why ? [`por qué: ${why}`] : [];
+    const tie = d.tie;
+    if (tie?.with?.length) {
+        const motivo = MOTIVOS[tie.reason]?.(tie) ?? `ganó por ${tie.reason}`;
+        lines.push(`empató con ${list(tie.with.map(String), 5)}${tie.more ? ` y ${tie.more} más` : ''}; ${motivo}`);
+    }
+    return lines;
+}
 /** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
 export function simulationSummary(r, leafNames) {
     const lines = [`Bot: ${botSaid(r, 600)}`];
@@ -284,6 +349,7 @@ export function simulationSummary(r, leafNames) {
     if (node)
         why.push(`hoja ${node}${r?.state?.current_node_id ? ` [${r.state.current_node_id}]` : ''}`);
     lines.push(why.join(' · '));
+    lines.push(...matchWhy(r?.match_detail));
     const params = paramValues(r?.parameters);
     if (params.length)
         lines.push(`parámetros del turno: ${params.join(', ')}`);

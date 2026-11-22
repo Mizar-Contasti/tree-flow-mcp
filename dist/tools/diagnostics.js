@@ -4,7 +4,8 @@ export function registerDiagnosticTools(client) {
     return [
         {
             name: 'treeflow_simulate_message',
-            description: 'Envía un mensaje de prueba al bot y devuelve lo que contestó, la intención detectada con su confianza, la ' +
+            description: 'Envía un mensaje de prueba al bot y devuelve lo que contestó, la intención detectada con su confianza y por qué ' +
+                'casó (qué entidad, sinónimo o patrón; con quién empató y por qué ganó), la ' +
                 'hoja en la que quedó (y el recorrido si pasó por varias), los parámetros capturados, qué scripts, APIs y SQL ' +
                 'corrieron (con qué entradas, cuáles llegaron vacías, qué guardaron y con qué nombre), qué regla de condición ' +
                 'se cumplió y el session_id. Sirve para validar un flujo recién armado. Para seguir la misma conversación, ' +

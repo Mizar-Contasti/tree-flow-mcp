@@ -36,6 +36,9 @@ export declare function treeOutline(data: {
 export declare const toolLine: (t: any) => string;
 export declare const scriptLine: (s: any) => string;
 export declare function fertilizersSummary(config: any): string;
+/** `match_detail` de Treeflow (backend/core/detector/detalle_coincidencia.py): por qué casó la intención y, si empató,
+ * por qué ganó. Un Treeflow que no lo manda no añade nada. */
+export declare function matchWhy(d: any): string[];
 /** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
 export declare function simulationSummary(r: any, leafNames?: Map<string, string>): string;
 /** Una prueba en una línea: lo que se mandó, qué intención ganó, dónde quedó y qué dijo. */
