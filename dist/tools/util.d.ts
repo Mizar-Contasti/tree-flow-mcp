@@ -20,6 +20,7 @@ export declare const variableSchema: {
             type: {
                 type: string;
                 enum: string[];
+                description: string;
             };
             description: {
                 type: string;

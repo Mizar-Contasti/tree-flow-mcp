@@ -8,7 +8,8 @@ type Kind = (typeof KINDS)[number];
 function find<T extends { id?: string; name?: string }>(items: T[], ref: string, what: string): T {
   const byId = items.find((x) => x.id === ref);
   if (byId) return byId;
-  const byName = items.filter((x) => x.name === ref);
+  let byName = items.filter((x) => x.name === ref);
+  if (!byName.length) byName = items.filter((x) => String(x.name).toLowerCase() === ref.trim().toLowerCase());
   if (byName.length === 1) return byName[0];
   if (byName.length > 1) {
     throw new Error(`"${ref}" es el nombre de ${byName.length} piezas (${byName.map((x) => x.id).join(', ')}): usa el ID.`);

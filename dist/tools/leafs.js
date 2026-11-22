@@ -53,7 +53,7 @@ async function createLeaves(client, branchId, leaves, connect = []) {
     catch (e) {
         const done = created.map((l) => `${l.name} [${l.id}]`).join(', ') || 'ninguna';
         const detail = e?.response?.data?.detail ?? e?.message ?? e;
-        throw new Error(`Falló la hoja ${created.length + 1} (${refs[created.length]}): ${typeof detail === 'object' ? JSON.stringify(detail) : detail}. Ya creadas: ${done}.`);
+        throw new Error(`Falló la hoja ${created.length + 1} (${refs[created.length]}): ${String(typeof detail === 'object' ? JSON.stringify(detail) : detail).replace(/\.$/, '')}. Ya creadas: ${done}.`);
     }
     const names = canvasNames([{ leaves: created }]);
     const lines = [`Hojas creadas (${created.length}):`, ...created.map((l) => leafLine(l, names))];
@@ -87,7 +87,7 @@ export function registerLeafTools(client) {
             description: 'Crea una o varias hojas en una rama, en una sola llamada. Enlázalas entre sí escribiendo "ref:<ref>" en ' +
                 'cualquier valor del config (nextLeafId, targetLeafId…): se sustituye por el ID. connect las conecta desde ' +
                 'hojas que ya existen (ej. el Start), en la misma llamada. Tipos y claves del config: treeflow_guide("hojas"). ' +
-                'Sin posición, se colocan en fila.',
+                'Condiciones en un nodo (Respuesta y Transición con reglas): treeflow_guide("condiciones"). Sin posición, se colocan en fila.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -131,7 +131,8 @@ export function registerLeafTools(client) {
             name: 'treeflow_update_leaf',
             description: 'Actualiza una hoja. config se combina con el guardado: manda sólo las claves que cambian (null borra una); ' +
                 'las listas (intents, events) se sustituyen completas. Para añadir o quitar UNA ruta de un trigger_context ' +
-                'usa add_routes / remove_routes: no hace falta leer ni reenviar la lista. Hace falta branch_id o tree_id.',
+                'usa add_routes / remove_routes: no hace falta leer ni reenviar la lista. Reglas condicionales (config.rules, ' +
+                'config.respuestasCondicionales): treeflow_guide("condiciones"). Hace falta branch_id o tree_id.',
             inputSchema: {
                 type: 'object',
                 properties: {

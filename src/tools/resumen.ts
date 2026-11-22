@@ -66,6 +66,15 @@ export function leafLine(leaf: any, names: CanvasNames): string {
   if (c.scriptIds?.length) parts.push(`${c.scriptIds.length} script`);
   if (c.llamaWebhook) parts.push('webhook');
   if (Array.isArray(c.linkedBranches) && c.linkedBranches.length) parts.push(`enlaza ${c.linkedBranches.length} rama(s)`);
+  // Reglas de condición: la Respuesta dice un mensaje, la Transición va a un nodo; si ninguna se cumple, lo de siempre.
+  const rule = (r: any) => clip(r?.name || r?.expression || '?', 30);
+  if (Array.isArray(c.respuestasCondicionales) && c.respuestasCondicionales.length) {
+    parts.push(`respuestas si: ${list(c.respuestasCondicionales.map(rule), 5)}`);
+  }
+  if (Array.isArray(c.rules) && c.rules.length) {
+    parts.push(`reglas: ${list(c.rules.map((r: any) => `${rule(r)}→${r?.targetLeafId ? leafName(r.targetLeafId) : '?'}`), 5)}`);
+  }
+  if (c.elseLeafId) parts.push(`si no→${leafName(c.elseLeafId)}`);
   if (c.nextLeafId) parts.push(`→ ${leafName(c.nextLeafId)}`);
   return parts.join(' · ');
 }
@@ -137,13 +146,15 @@ export function templatesSummary(templates: any[]): string {
 
 // ── El bot completo ──────────────────────────────────────────────────────────
 
-export function treeHeader(tree: any): string {
+export function treeHeader(tree: any, showEnvironment = false): string {
   const parts = [`Bot "${tree.name}" [${tree.tree_id ?? tree.id}]`];
+  if (tree.ambiente && (showEnvironment || tree.ambiente !== 'prod')) parts.push(`ambiente ${tree.ambiente}`);
   if (tree.purpose) parts.push(`propósito ${tree.purpose}`);
   if (tree.primary_language) parts.push(`idioma ${tree.primary_language}`);
   if (tree.nlp_mode) parts.push(`NLP ${tree.nlp_mode}`);
   if (tree.ml_confidence_threshold !== undefined) parts.push(`umbral ML ${tree.ml_confidence_threshold}`);
   if (tree.fuzzy_confidence_threshold !== undefined) parts.push(`umbral difuso ${tree.fuzzy_confidence_threshold}`);
+  if (tree.condicionales) parts.push('condicionales');
   return parts.join(' · ');
 }
 
@@ -238,8 +249,39 @@ const paramValues = (params: any) =>
     .filter(([k]) => !SYSTEM_PARAMS.has(k))
     .map(([k, p]: [string, any]) => `${k}=${clip(p?.key_value ?? p?.original_value ?? p, 40)}`);
 
+/**
+ * Lo que corrió en el turno, para que quien arma el flujo lo valide sin abrir nada más: cada script, API o SQL con
+ * lo que recibió (y lo que no llegó) y lo que guardó en la sesión; las reglas que decidieron; una transferencia.
+ */
+function executionLines(r: any): string[] {
+  const lines: string[] = [];
+  for (const t of r?.debug_tools ?? []) {
+    const ins = Object.entries(t.inputs ?? {}).map(([k, v]) => `${k}=${v === null || v === undefined || v === '' ? '(sin valor)' : clip(v, 30)}`);
+    const saved = t.guardado_en ?? {};
+    const outs = Object.entries(t.outputs ?? {}).map(([k, v]) => {
+      const as = Object.entries(saved).find(([, target]) => target === k)?.[0];
+      return `${as && as !== k ? `${as}→` : ''}${k}=${clip(v, 30)}`;
+    });
+    const parts = [`${t.kind ?? 'tool'} ${t.tool_name} ${t.estado ?? '?'}${t.execution_ms !== undefined ? ` ${t.execution_ms}ms` : ''}`];
+    parts.push(ins.length ? `entradas ${ins.join(', ')}` : 'sin entradas');
+    parts.push(outs.length ? `guardó ${outs.join(', ')}` : 'no guardó nada');
+    if (t.fallback_used) parts.push('con valores de respaldo');
+    if (t.error) parts.push(`error: ${clip(t.error, 120)}`);
+    lines.push(`- ${parts.join(' · ')}`);
+  }
+  const rules = (r?.debug_condiciones ?? []).map((c: any) =>
+    c.decision === 'si no' ? `${c.nodo}: ninguna regla se cumplió (sigue por lo de siempre)` :
+    `${c.nodo}: se cumplió ${clip(c.decision, 60)} → ${c.destino === 'respuesta' ? 'cambió lo que dice' : `va a ${c.destino ?? '?'}`}`);
+  const transfer = r?.debug_transfer;
+  return [
+    ...(lines.length ? ['herramientas que corrieron:', ...lines] : []),
+    ...(rules.length ? [`reglas: ${rules.join(' | ')}`] : []),
+    ...(transfer ? [`transferencia a humano (${transfer.destino ?? '?'}) desde ${transfer.nodo ?? '?'}${transfer.error ? ` · error: ${clip(transfer.error, 100)}` : ''}`] : []),
+  ];
+}
+
 /** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
-export function simulationSummary(r: any): string {
+export function simulationSummary(r: any, leafNames?: Map<string, string>): string {
   const lines = [`Bot: ${botSaid(r, 600)}`];
   const why = [r?.intent ? `intención ${r.intent}` : 'sin intención'];
   if (typeof r?.confidence === 'number') why.push(`confianza ${r.confidence.toFixed(2)}`);
@@ -252,6 +294,9 @@ export function simulationSummary(r: any): string {
   const session = paramValues(r?.session_parameters).filter((p) => !params.includes(p));
   if (session.length) lines.push(`en la sesión: ${session.join(', ')}`);
   if (r?.slot_filling?.active) lines.push(`slot filling: pidiendo ${r.slot_filling.parameter ?? '?'}`);
+  lines.push(...executionLines(r));
+  const path: string[] = r?.posicion_final?.camino ?? [];
+  if (path.length) lines.push(`recorrido: ${[...path, r.posicion_final.leaf_id].map((id) => leafNames?.get(id) ?? id).join(' › ')}`);
   if (r?.session_id) lines.push(`session_id: ${r.session_id} (mándalo en el siguiente mensaje para seguir esta conversación)`);
   return lines.join('\n');
 }

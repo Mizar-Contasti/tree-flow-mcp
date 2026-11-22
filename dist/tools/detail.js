@@ -6,7 +6,9 @@ function find(items, ref, what) {
     const byId = items.find((x) => x.id === ref);
     if (byId)
         return byId;
-    const byName = items.filter((x) => x.name === ref);
+    let byName = items.filter((x) => x.name === ref);
+    if (!byName.length)
+        byName = items.filter((x) => String(x.name).toLowerCase() === ref.trim().toLowerCase());
     if (byName.length === 1)
         return byName[0];
     if (byName.length > 1) {

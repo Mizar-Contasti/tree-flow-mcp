@@ -18,7 +18,7 @@ export declare function entityLine(entity: any): string;
 export declare function entitiesSummary(entities: any[]): string;
 export declare function templateLine(template: any): string;
 export declare function templatesSummary(templates: any[]): string;
-export declare function treeHeader(tree: any): string;
+export declare function treeHeader(tree: any, showEnvironment?: boolean): string;
 export declare const SECTIONS: readonly ["canvas", "ramas", "intenciones", "entidades", "plantillas"];
 export type Section = (typeof SECTIONS)[number];
 export declare const DEFAULT_SECTIONS: Section[];
@@ -37,7 +37,7 @@ export declare const toolLine: (t: any) => string;
 export declare const scriptLine: (s: any) => string;
 export declare function fertilizersSummary(config: any): string;
 /** Un turno simulado: qué contestó el bot, por qué, dónde quedó y cómo seguir. */
-export declare function simulationSummary(r: any): string;
+export declare function simulationSummary(r: any, leafNames?: Map<string, string>): string;
 /** Una prueba en una línea: lo que se mandó, qué intención ganó, dónde quedó y qué dijo. */
 export declare function testLine(message: string, r: any): string;
 export declare function conversationsList(convs: any[]): string;

@@ -1,7 +1,7 @@
 import { ok } from './util.js';
 // Un borrado por tipo en una sola herramienta, como treeflow_get_detail: diez herramientas
 // casi iguales pesaban en el catálogo en cada llamada.
-const KINDS = ['branch', 'leaf', 'intent', 'entity', 'template', 'tool', 'script', 'capture', 'transfer', 'test_suite'];
+const KINDS = ['branch', 'leaf', 'intent', 'entity', 'template', 'tool', 'script', 'capture', 'transfer', 'test_suite', 'condition', 'sql_query', 'sql_connection'];
 const remove = {
     branch: (c, _t, ref) => c.deleteBranch(ref),
     leaf: (c, _t, ref) => c.deleteLeaf(ref),
@@ -13,14 +13,17 @@ const remove = {
     capture: (c, t, ref) => c.deleteCapture(t, ref),
     transfer: (c, t, ref) => c.deleteTransfer(t, ref),
     test_suite: (c, _t, ref) => c.deleteTestSuite(ref),
+    sql_query: (c, t, ref) => c.deleteSql(t, 'consulta', ref),
+    sql_connection: (c, t, ref) => c.deleteSql(t, 'conexión', ref),
+    condition: async (c, t, ref) => c.deleteCondition((await c.findCondition(t, ref)).condicion_id),
 };
 export function registerDeleteTools(client) {
     return [
         {
             name: 'treeflow_delete',
             description: 'Borra UNA pieza del bot. Es irreversible: confírmalo con el usuario antes. tipo: branch (con todas sus ' +
-                'hojas), leaf, intent, entity, template, tool (API), script, capture, transfer o test_suite (con su historial). ' +
-                'ref es el ID; tool, script y capture aceptan también el nombre. Borrar intenciones o entidades obliga a ' +
+                'hojas), leaf, intent, entity, template, tool (API), script, capture, transfer, condition (las reglas que la usan se quedan como propias), sql_query, sql_connection (si ninguna ' +
+                'consulta la usa) o test_suite (con su historial). ref es el ID; tool, script, capture, condition y sql_* aceptan también el nombre. Borrar intenciones o entidades obliga a ' +
                 'reentrenar. Los bots y los usuarios no se borran desde aquí.',
             inputSchema: {
                 type: 'object',
@@ -34,8 +37,9 @@ export function registerDeleteTools(client) {
             handler: async (a) => {
                 if (!KINDS.includes(a.tipo))
                     throw new Error(`tipo debe ser uno de: ${KINDS.join(', ')}`);
-                await remove[a.tipo](client, a.tree_id, a.ref);
-                return ok(`Borrado: ${a.tipo} ${a.ref}`);
+                const res = await remove[a.tipo](client, a.tree_id, a.ref);
+                const nodes = typeof res?.nodos_actualizados === 'number' ? ` (${res.nodos_actualizados} nodo(s) quedan con la regla propia)` : '';
+                return ok(`Borrado: ${a.tipo} ${a.ref}${nodes}`);
             },
         },
     ];

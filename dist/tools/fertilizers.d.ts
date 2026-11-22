@@ -106,6 +106,7 @@ export declare function registerFertilizerTools(client: TreeflowClient): ({
                         type: {
                             type: string;
                             enum: string[];
+                            description: string;
                         };
                         description: {
                             type: string;
@@ -138,6 +139,7 @@ export declare function registerFertilizerTools(client: TreeflowClient): ({
                         type: {
                             type: string;
                             enum: string[];
+                            description: string;
                         };
                         description: {
                             type: string;
@@ -348,6 +350,7 @@ export declare function registerFertilizerTools(client: TreeflowClient): ({
                         type: {
                             type: string;
                             enum: string[];
+                            description: string;
                         };
                         description: {
                             type: string;
@@ -379,6 +382,7 @@ export declare function registerFertilizerTools(client: TreeflowClient): ({
                         type: {
                             type: string;
                             enum: string[];
+                            description: string;
                         };
                         description: {
                             type: string;

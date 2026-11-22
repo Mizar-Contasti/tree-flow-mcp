@@ -12,6 +12,18 @@ export interface Route {
  * nombre se redirige en vez de duplicarse. Los IDs nuevos siguen el formato del editor.
  */
 export declare function editRoutes(config: Record<string, any>, add?: Route[], remove?: string[]): Record<string, any>;
+/** Una condición guardada del bot (/api/condiciones). */
+export interface ConditionInput {
+    name?: string;
+    expression?: string;
+    description?: string | null;
+}
+/**
+ * Deja las reglas de un config como las guarda el editor: cada una con su `id` (el editor lo usa de
+ * clave) y, si trae `condicion` (nombre o ID de una condición guardada), con su `condicionId`.
+ * `conditions` son las del bot; sólo hace falta si alguna regla nombra una. Devuelve una copia.
+ */
+export declare function normalizeRules(config: Record<string, any>, conditions?: any[]): Record<string, any>;
 /** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
 export declare function editList(current: string[], add?: string[], remove?: string[]): string[];
 export interface IntentParamInput {
@@ -36,7 +48,7 @@ export declare function normalizeIntentParams(params: IntentParamInput[] | undef
     required: boolean;
     prompt?: string;
 }[];
-export declare const RICH_BLOCK_TYPES: readonly ["paragraph", "image", "video", "audio", "file", "buttons", "quick_replies", "accordion", "dropdown", "location", "divider", "card", "carousel", "html"];
+export declare const RICH_BLOCK_TYPES: readonly ["paragraph", "image", "video", "audio", "file", "buttons", "quick_replies", "accordion", "dropdown", "location", "divider", "card", "carousel", "html", "message_break"];
 /** Un bloque enriquecido con los campos que pone el editor al crearlo. */
 export declare function normalizeBlock(block: any): Record<string, any>;
 /**
@@ -49,7 +61,7 @@ export declare function normalizeTemplateResponses(responses: any[] | undefined)
 export declare function defaultTemplateText(responses: any[] | undefined): string | undefined;
 export interface ToolVariableInput {
     name: string;
-    type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
+    type?: 'auto' | 'string' | 'number' | 'boolean' | 'object' | 'array';
     description?: string;
     jsonPath?: string;
     testValue?: string;
@@ -109,6 +121,13 @@ export declare class TreeflowClient {
         primary_language?: string;
     }): Promise<any>;
     updateTree(treeId: string, data: Record<string, any>): Promise<any>;
+    /** "saas" (app.tree-flow.com y dev: sin ambientes) o "instancia". */
+    getEdition(): Promise<string>;
+    getEnvironments(treeId: string): Promise<any>;
+    listPublications(treeId: string): Promise<any[]>;
+    publish(treeId: string, destino: string, nota?: string): Promise<any>;
+    revertEnvironment(treeId: string, nota?: string): Promise<any>;
+    cancelPublication(publicationId: string): Promise<any>;
     listBranches(treeId: string): Promise<any>;
     createBranch(treeId: string, data: {
         name: string;
@@ -252,6 +271,38 @@ export declare class TreeflowClient {
         date_from?: string;
         date_to?: string;
     }): Promise<any>;
+    getSql(treeId: string): Promise<{
+        conexiones: any[];
+        consultas: any[];
+    }>;
+    saveSqlConnections(treeId: string, conexiones: any[]): Promise<{
+        conexiones: any[];
+        consultas: any[];
+    }>;
+    saveSqlQueries(treeId: string, consultas: any[]): Promise<{
+        conexiones: any[];
+        consultas: any[];
+    }>;
+    testSqlConnection(treeId: string, conexion: Record<string, any>): Promise<any>;
+    testSqlQuery(treeId: string, consulta: Record<string, any>): Promise<any>;
+    /** Por ID, o por nombre sin distinguir mayúsculas. `kind` sólo para el mensaje. */
+    findSql<T extends Record<string, any>>(items: T[], ref: string, key: 'nombre' | 'name', kind: string): T;
+    saveSqlConnection(treeId: string, ref: string | undefined, fields: Record<string, any>): Promise<any>;
+    saveSqlQuery(treeId: string, ref: string | undefined, fields: Record<string, any>): Promise<any>;
+    deleteSql(treeId: string, kind: 'consulta' | 'conexión', ref: string): Promise<{
+        deleted: any;
+        name: any;
+    }>;
+    listConditions(treeId: string): Promise<any>;
+    getCondition(conditionId: string): Promise<any>;
+    createCondition(treeId: string, data: {
+        name: string;
+        expression: string;
+        description?: string;
+    }): Promise<any>;
+    updateCondition(conditionId: string, patch: ConditionInput): Promise<any>;
+    deleteCondition(conditionId: string): Promise<any>;
+    findCondition(treeId: string, ref: string): Promise<any>;
     listCaptures(treeId: string): Promise<any>;
     getCapture(treeId: string, ref: string): Promise<any>;
     createCapture(treeId: string, data: Record<string, any>): Promise<any>;

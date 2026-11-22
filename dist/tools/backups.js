@@ -70,8 +70,10 @@ export function registerBackupTools(client) {
         },
         {
             name: 'treeflow_restore_snapshot',
-            description: 'RESTAURA el bot al estado de un snapshot, SOBRESCRIBIENDO el estado actual. Antes de restaurar se crea automáticamente ' +
-                'un snapshot del estado actual para poder deshacerlo. Exige confirm=true: pídele confirmación explícita al usuario y ' +
+            description: 'RESTAURA el bot al estado de un snapshot, SOBRESCRIBIENDO el estado actual: configuración, intenciones, entidades, ' +
+                'flujos, mensajes, voz y herramientas (con las consultas SQL; sus contraseñas, el token de Telegram y las ' +
+                'conexiones actuales se conservan). No borra las conversaciones ni los historiales: un snapshot automático ' +
+                'sólo trae el historial desde el anterior. Restaurar por módulos sólo se hace en el panel. Antes de restaurar se crea un snapshot del estado actual para poder deshacerlo. Exige confirm=true: pídele confirmación explícita al usuario y ' +
                 'dile qué snapshot (treeflow_list_backups) se va a aplicar. Después hay que reentrenar.',
             inputSchema: {
                 type: 'object',

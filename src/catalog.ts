@@ -21,6 +21,9 @@ import { registerBackupTools } from './tools/backups.js';
 import { registerDetailTools } from './tools/detail.js';
 import { registerDeleteTools } from './tools/delete.js';
 import { registerGuideTools } from './tools/guide.js';
+import { registerConditionTools } from './tools/conditions.js';
+import { registerSqlTools } from './tools/sql.js';
+import { registerEnvironmentTools } from './tools/environments.js';
 
 export interface ToolDef {
   name: string;
@@ -35,8 +38,10 @@ export interface ToolDef {
 // Lo que no cae en ningún grupo es la base y siempre está.
 export const TOOLSETS: Record<string, { label: string; match: RegExp }> = {
   capturas: { label: 'capturas del slot filling', match: /^treeflow_(list_captures|get_capture|save_capture)$/ },
+  condiciones: { label: 'condiciones guardadas que los nodos comparten', match: /^treeflow_(list_conditions|save_condition)$/ },
   respaldos: { label: 'snapshots, export e import del bot', match: /^treeflow_(list_backups|create_backup|export_tree|import_tree|restore_snapshot)$/ },
   apis: { label: 'APIs y scripts del bot, con sus pruebas y logs', match: /^treeflow_(list_fertilizers|save_tool|test_tool|list_tool_logs|save_script|test_script)$/ },
+  sql: { label: 'conexiones y consultas SQL a la base del cliente', match: /^treeflow_(list_sql|save_sql_connection|test_sql_connection|save_sql_query|test_sql_query)$/ },
   pruebas: {
     label: 'suites de prueba y sus ejecuciones',
     match: /^treeflow_(list_test_suites|get_test_suite|save_test_suite|import_test_suite_csv|export_test_suite_csv|run_test_suite|list_test_runs|get_test_run|compare_test_runs)$/,
@@ -50,6 +55,7 @@ export const TOOLSETS: Record<string, { label: string; match: RegExp }> = {
     label: 'configuración del bot (umbrales, NLP), canales, voz, usuarios y credenciales',
     match: /^treeflow_(get_tree|update_tree|list_integrations|configure_integration|get_voice_config|update_voice_config|list_users|create_user|update_user|list_credentials)$/,
   },
+  ambientes: { label: 'ambientes Dev, QA y Prod: ver y copiar entre ellos (instancias)', match: /^treeflow_(list_environments|publish)$/ },
 };
 export const DEFAULT_TOOLSETS = ['capturas', 'respaldos'];
 
@@ -99,7 +105,7 @@ espera, dice si quedó listo y, con probar, prueba mensajes en la misma llamada.
 los cambios no surten efecto y nada avisa.
 
 TEXTOS CON HUECOS: {$variable}. La sintaxis {{ }} ya no existe e imprime otra cosa.
-Guía de referencia (plantillas, bloques, APIs, scripts, hojas, capturas, suites): treeflow_guide.
+Guía de referencia (plantillas, bloques, APIs, scripts, hojas, condiciones, SQL, capturas, suites): treeflow_guide.
 
 El workspace sale de la API key: no lo pidas. Los secretos salen como ***; devolverlos así no
 los pisa.${active.has('respaldos') ? ' Antes de cambios grandes, treeflow_create_backup.' : ''} ${irreversible} con el
@@ -169,6 +175,9 @@ export function buildToolGroups(client: TreeflowClient): Record<string, ToolDef[
     history: registerHistoryTools(client),
     users: registerUserTools(client),
     captures: registerCaptureTools(client),
+    conditions: registerConditionTools(client),
+    sql: registerSqlTools(client),
+    environments: registerEnvironmentTools(client),
     transfers: registerTransferTools(client),
     suites: registerSuiteTools(client),
     livechat: registerLiveChatTools(client),

@@ -34,7 +34,7 @@ export const variableSchema = {
         type: 'object',
         properties: {
             name: { type: 'string' },
-            type: { type: 'string', enum: ['string', 'number', 'boolean', 'object', 'array'] },
+            type: { type: 'string', enum: ['auto', 'string', 'number', 'boolean', 'object', 'array'], description: 'auto: el valor tal cual llega, sin convertir (scripts)' },
             description: { type: 'string' },
             jsonPath: { type: 'string', description: 'Salidas: ruta en la respuesta' },
             testValue: { type: 'string', description: 'Entradas: valor de prueba' },

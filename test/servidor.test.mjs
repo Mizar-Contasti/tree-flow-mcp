@@ -25,12 +25,12 @@ async function conectar(env = {}) {
 test('por defecto ofrece la base, capturas y respaldos, y la herramienta para activar el resto', async () => {
   const client = await conectar();
   try {
-    assert.equal(client.getServerVersion().version, '1.3.1');
+    assert.equal(client.getServerVersion().version, '1.4.0');
     const names = (await client.listTools()).tools.map((t) => t.name);
     assert.ok(names.includes('treeflow_get_tree_data') && names.includes('treeflow_save_capture') && names.includes('treeflow_create_backup'));
     assert.ok(!names.includes('treeflow_save_tool'), 'las APIs no vienen por defecto');
     assert.ok(names.includes('treeflow_enable_tools'));
-    assert.match(client.getInstructions(), /HAY MÁS HERRAMIENTAS sin cargar \(apis, pruebas, atencion, historial, admin\)/);
+    assert.match(client.getInstructions(), /HAY MÁS HERRAMIENTAS sin cargar \(condiciones, apis, sql, pruebas, atencion, historial, admin, ambientes\)/);
   } finally {
     await client.close();
   }
@@ -65,7 +65,7 @@ test('TREEFLOW_TOOLSETS=todo carga todo y no ofrece activar nada', async () => {
   const client = await conectar({ TREEFLOW_TOOLSETS: 'todo' });
   try {
     const names = (await client.listTools()).tools.map((t) => t.name);
-    assert.equal(names.length, 62);
+    assert.equal(names.length, 71);
     assert.ok(!names.includes('treeflow_enable_tools'));
   } finally {
     await client.close();

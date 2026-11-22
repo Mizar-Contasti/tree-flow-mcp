@@ -52,6 +52,50 @@ export function editRoutes(config: Record<string, any>, add: Route[] = [], remov
   return out;
 }
 
+
+/** Una condición guardada del bot (/api/condiciones). */
+export interface ConditionInput {
+  name?: string;
+  expression?: string;
+  description?: string | null;
+}
+
+/**
+ * Deja las reglas de un config como las guarda el editor: cada una con su `id` (el editor lo usa de
+ * clave) y, si trae `condicion` (nombre o ID de una condición guardada), con su `condicionId`.
+ * `conditions` son las del bot; sólo hace falta si alguna regla nombra una. Devuelve una copia.
+ */
+export function normalizeRules(config: Record<string, any>, conditions: any[] = []): Record<string, any> {
+  const out: Record<string, any> = { ...config };
+  const stamp = Date.now();
+  let n = 0;
+  for (const [key, prefix] of [['rules', 'regla'], ['respuestasCondicionales', 'rr']] as const) {
+    if (!Array.isArray(out[key])) continue;
+    out[key] = out[key].map((rule: any) => {
+      if (!rule || typeof rule !== 'object') return rule;
+      const { condicion, ...r } = rule;
+      if (!r.id) r.id = `${prefix}_${stamp}${n++}`;
+      if (condicion !== undefined && condicion !== null && condicion !== '') {
+        const wanted = String(condicion).trim().toLowerCase();
+        const found = conditions.filter((c) => c.condicion_id === condicion || String(c.name).trim().toLowerCase() === wanted);
+        if (found.length !== 1) {
+          throw new Error(
+            found.length
+              ? `Hay ${found.length} condiciones llamadas "${condicion}": usa su ID en condicionId.`
+              : `No existe la condición guardada "${condicion}". Hay: ${conditions.map((c) => c.name).join(', ') || 'ninguna'}.`
+          );
+        }
+        r.condicionId = found[0].condicion_id;
+      }
+      return r;
+    });
+  }
+  return out;
+}
+
+const hasRuleNames = (config: any) =>
+  ['rules', 'respuestasCondicionales'].some((k) => Array.isArray(config?.[k]) && config[k].some((r: any) => r && r.condicion));
+
 /** Aplica altas y bajas a una lista de textos sin duplicar ni tocar el resto. */
 export function editList(current: string[], add: string[] = [], remove: string[] = []) {
   const drop = new Set(remove.map((s) => s.trim()));
@@ -149,6 +193,8 @@ export function normalizeIntentParams(params: IntentParamInput[] | undefined, en
 export const RICH_BLOCK_TYPES = [
   'paragraph', 'image', 'video', 'audio', 'file', 'buttons', 'quick_replies',
   'accordion', 'dropdown', 'location', 'divider', 'card', 'carousel', 'html',
+  // «Nuevo mensaje»: lo que va después sale en otra burbuja (otro mensaje en los canales).
+  'message_break',
 ] as const;
 const RICH_BLOCKS = new Set<string>(RICH_BLOCK_TYPES);
 
@@ -169,6 +215,7 @@ export function normalizeBlock(block: any) {
     out.items = [{ text: block.text }];
   }
   if (block.type === 'divider') out.items ??= [];
+  if (block.type === 'message_break') out.items = [];
   if (!Array.isArray(out.items)) {
     throw new Error(`El bloque ${block.type} necesita items (una lista). Formato de cada bloque: treeflow_guide("bloques").`);
   }
@@ -234,7 +281,7 @@ export function defaultTemplateText(responses: any[] | undefined): string | unde
 
 export interface ToolVariableInput {
   name: string;
-  type?: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  type?: 'auto' | 'string' | 'number' | 'boolean' | 'object' | 'array';
   description?: string;
   jsonPath?: string;
   testValue?: string;
@@ -361,12 +408,19 @@ export class TreeflowClient {
     if (!this.treesCache || Date.now() - this.treesCache.at > 60_000) {
       this.treesCache = { at: Date.now(), trees: await this.listTrees() };
     }
-    const wanted = ref.trim().toLowerCase();
+    // En una instancia cada bot tiene tres ambientes con el mismo nombre: "Nombre@qa" elige uno y, sin
+    // sufijo, se trabaja en Dev (el que se edita; QA y Prod se llenan copiando).
+    const env = /^(.*\S)\s*@(dev|qa|prod)$/i.exec(ref.trim());
+    const wanted = (env ? env[1] : ref).trim().toLowerCase();
     // Un ID corto (8 o 12 hexadecimales) se busca como prefijo del ID; lo demás, como nombre.
     const byPrefix = /^[0-9a-f]{8}([0-9a-f]{4})?$/.test(wanted);
-    const matches = this.treesCache.trees.filter((t: any) =>
+    let matches = this.treesCache.trees.filter((t: any) =>
       byPrefix ? String(t.tree_id).replace(/-/g, '').startsWith(wanted) : String(t.name).trim().toLowerCase() === wanted
     );
+    if (env) matches = matches.filter((t: any) => t.ambiente === env[2].toLowerCase());
+    else if (matches.length > 1 && matches[0].agente_id && new Set(matches.map((t: any) => t.agente_id)).size === 1) {
+      matches = matches.filter((t: any) => t.ambiente === 'dev');
+    }
     if (matches.length === 1) return matches[0].tree_id;
     if (matches.length > 1) throw new Error(`Hay ${matches.length} bots llamados "${ref}": usa su ID.`);
     this.treesCache = undefined; // quizá es nuevo: la próxima vez se vuelve a listar
@@ -410,6 +464,38 @@ export class TreeflowClient {
     return response.data;
   }
 
+  // --- 1b. AMBIENTES (Dev | QA | Prod de un bot; sólo en las instancias) ---
+  /** "saas" (app.tree-flow.com y dev: sin ambientes) o "instancia". */
+  async getEdition(): Promise<string> {
+    const response = await this.client.get('/api/instancia');
+    return response.data?.edicion ?? 'saas';
+  }
+
+  async getEnvironments(treeId: string) {
+    const response = await this.client.get(`/api/agentes/${treeId}/ambientes`);
+    return response.data;
+  }
+
+  async listPublications(treeId: string) {
+    const response = await this.client.get(`/api/agentes/${treeId}/publicaciones`);
+    return response.data as any[];
+  }
+
+  async publish(treeId: string, destino: string, nota?: string) {
+    const response = await this.client.post(`/api/agentes/${treeId}/publicar`, { destino, ...(nota ? { nota } : {}) });
+    return response.data;
+  }
+
+  async revertEnvironment(treeId: string, nota?: string) {
+    const response = await this.client.post(`/api/agentes/${treeId}/volver`, nota ? { nota } : {});
+    return response.data;
+  }
+
+  async cancelPublication(publicationId: string) {
+    const response = await this.client.post(`/api/agentes/publicaciones/${publicationId}/cancelar`);
+    return response.data;
+  }
+
   // --- 2. BRANCHES (Canvas Flujos) ---
   async listBranches(treeId: string) {
     const response = await this.client.get(`/design/${treeId}/branches`);
@@ -448,6 +534,10 @@ export class TreeflowClient {
     branchId: string,
     data: { id?: string; name?: string; type: string; position_x?: number; position_y?: number; config?: any; is_start?: boolean }
   ) {
+    if (data.config && typeof data.config === 'object') {
+      const treeId = hasRuleNames(data.config) ? (await this.getBranch(branchId)).tree_id : undefined;
+      data = { ...data, config: normalizeRules(data.config, treeId ? await this.listConditions(treeId) : []) };
+    }
     const response = await this.client.post(`/design/branches/${branchId}/leaves`, {
       ...(data.id ? { id: data.id } : {}),
       name: data.name || data.type,
@@ -492,6 +582,12 @@ export class TreeflowClient {
       const current = await this.findLeaf(leafId, options);
       const base = options.replaceConfig ? body.config ?? {} : mergeConfig(current.config ?? {}, body.config ?? {});
       body.config = routes ? editRoutes(base, options.addRoutes, options.removeRoutes) : base;
+    }
+    if (body.config && typeof body.config === 'object') {
+      const needsTree = hasRuleNames(body.config);
+      if (needsTree && !options.treeId && !options.branchId) throw new Error('Para nombrar una condición guardada hace falta branch_id o tree_id.');
+      const treeId = needsTree ? options.treeId ?? (await this.getBranch(options.branchId!)).tree_id : undefined;
+      body.config = normalizeRules(body.config, treeId ? await this.listConditions(treeId) : []);
     }
     const response = await this.client.put(`/design/leaves/${leafId}`, body);
     return response.data;
@@ -860,6 +956,141 @@ export class TreeflowClient {
   async listToolLogs(treeId: string, params: { limit?: number; offset?: number; success?: boolean; tool_name?: string; search?: string; date_from?: string; date_to?: string } = {}) {
     const response = await this.client.get(`/api/fertilizers/${treeId}/tool-logs`, { params: pickDefined(params) });
     return response.data;
+  }
+
+  // --- 6c. SQL: conexiones y consultas contra la base del cliente ---
+  // El backend guarda cada lista entera (PUT sustituye): se lee, se cambia una pieza y se devuelve.
+  async getSql(treeId: string) {
+    const response = await this.client.get(`/api/sql/${treeId}`);
+    return response.data as { conexiones: any[]; consultas: any[] };
+  }
+
+  async saveSqlConnections(treeId: string, conexiones: any[]) {
+    const response = await this.client.put(`/api/sql/${treeId}/conexiones`, { conexiones });
+    return response.data as { conexiones: any[]; consultas: any[] };
+  }
+
+  async saveSqlQueries(treeId: string, consultas: any[]) {
+    const response = await this.client.put(`/api/sql/${treeId}/consultas`, { consultas });
+    return response.data as { conexiones: any[]; consultas: any[] };
+  }
+
+  async testSqlConnection(treeId: string, conexion: Record<string, any>) {
+    const response = await this.client.post(`/api/sql/${treeId}/conexiones/probar`, { conexion });
+    return response.data;
+  }
+
+  async testSqlQuery(treeId: string, consulta: Record<string, any>) {
+    const response = await this.client.post(`/api/sql/${treeId}/consultas/probar`, { consulta });
+    return response.data;
+  }
+
+  /** Por ID, o por nombre sin distinguir mayúsculas. `kind` sólo para el mensaje. */
+  findSql<T extends Record<string, any>>(items: T[], ref: string, key: 'nombre' | 'name', kind: string): T {
+    const wanted = ref.trim().toLowerCase();
+    const found = items.filter((x) => x.id === ref || String(x[key]).trim().toLowerCase() === wanted);
+    if (found.length === 1) return found[0];
+    throw new Error(`No existe ${kind} "${ref}". Hay: ${items.map((x) => x[key]).join(', ') || 'ninguna'}.`);
+  }
+
+  async saveSqlConnection(treeId: string, ref: string | undefined, fields: Record<string, any>) {
+    const { conexiones } = await this.getSql(treeId);
+    const { new_name, ...rest } = fields;
+    const data = withoutMasked(pickDefined(rest));
+    let next: any[];
+    if (ref) {
+      const current = this.findSql(conexiones, ref, 'nombre', 'la conexión');
+      // Con el id y sin password el backend conserva la guardada (si no cambia adónde se conecta).
+      const { tienePassword: _t, ...base } = current;
+      const merged = { ...base, ...data, ...(new_name ? { nombre: new_name } : {}) };
+      next = conexiones.map((c) => (c.id === current.id ? merged : { ...c }));
+    } else {
+      if (!data.nombre || !data.motor || !data.host) throw new Error('Para crear una conexión hacen falta nombre, motor y host (para modificar una, manda connection_ref).');
+      next = [...conexiones, data];
+    }
+    const saved = await this.saveSqlConnections(treeId, next.map(({ tienePassword: _t, ...c }) => c));
+    const nombre = ref ? (new_name || this.findSql(conexiones, ref, 'nombre', 'la conexión').nombre) : data.nombre;
+    return saved.conexiones.find((c) => String(c.nombre).toLowerCase() === String(nombre).toLowerCase())!;
+  }
+
+  async saveSqlQuery(treeId: string, ref: string | undefined, fields: Record<string, any>) {
+    const { conexiones, consultas } = await this.getSql(treeId);
+    const { inputVariables, outputVariables, connection, ...simple } = fields;
+    const patch: Record<string, any> = pickDefined(simple);
+    if (inputVariables !== undefined) patch.inputVariables = toVariables(inputVariables);
+    if (outputVariables !== undefined) patch.outputVariables = toVariables(outputVariables);
+    if (connection !== undefined) {
+      const c = conexiones.find((x) => String(x.nombre).toLowerCase() === String(connection).trim().toLowerCase());
+      if (!c) throw new Error(`No existe la conexión "${connection}". Hay: ${conexiones.map((x) => x.nombre).join(', ') || 'ninguna'} (treeflow_save_sql_connection crea una).`);
+      patch.conexion = c.nombre; // la consulta nombra su conexión por nombre
+    }
+    let target: any;
+    let next: any[];
+    if (ref) {
+      const current = this.findSql(consultas, ref, 'name', 'la consulta');
+      // Si cambia lo que se ejecuta, vuelve a «sin probar», como en el editor.
+      const runs = ['sql', 'conexion', 'inputVariables', 'outputVariables', 'timeout', 'maxFilas'].some((k) => k in patch);
+      target = { ...current, ...patch, ...(runs && patch.status === undefined ? { status: 'unconfigured' } : {}) };
+      next = consultas.map((q) => (q.id === current.id ? target : q));
+    } else {
+      if (!patch.name || !patch.sql || !patch.conexion) throw new Error('Para crear una consulta hacen falta name, sql y connection (para modificar una, manda query_ref).');
+      target = { id: `sql_${randomUUID().replace(/-/g, '').slice(0, 12)}`, status: 'unconfigured', enabled: true, ...patch };
+      next = [...consultas, target];
+    }
+    const saved = await this.saveSqlQueries(treeId, next);
+    return saved.consultas.find((q) => q.id === target.id || q.name === target.name)!;
+  }
+
+  async deleteSql(treeId: string, kind: 'consulta' | 'conexión', ref: string) {
+    const { conexiones, consultas } = await this.getSql(treeId);
+    if (kind === 'consulta') {
+      const q = this.findSql(consultas, ref, 'name', 'la consulta');
+      await this.saveSqlQueries(treeId, consultas.filter((x) => x.id !== q.id));
+      return { deleted: q.id, name: q.name };
+    }
+    const c = this.findSql(conexiones, ref, 'nombre', 'la conexión');
+    const users = consultas.filter((q) => q.conexion === c.nombre).map((q) => q.name);
+    if (users.length) throw new Error(`La conexión "${c.nombre}" la usan las consultas ${users.join(', ')}: cámbialas o bórralas antes.`);
+    await this.saveSqlConnections(treeId, conexiones.filter((x) => x.id !== c.id).map(({ tienePassword: _t, ...x }) => x));
+    return { deleted: c.id, name: c.nombre };
+  }
+
+  // --- 7a. CONDICIONES GUARDADAS (reglas con nombre que varios nodos comparten) ---
+  async listConditions(treeId: string) {
+    const response = await this.client.get(`/api/condiciones/tree/${treeId}`);
+    return response.data;
+  }
+
+  async getCondition(conditionId: string) {
+    const response = await this.client.get(`/api/condiciones/${conditionId}`);
+    return response.data;
+  }
+
+  async createCondition(treeId: string, data: { name: string; expression: string; description?: string }) {
+    const response = await this.client.post(`/api/condiciones/tree/${treeId}`, data);
+    return response.data;
+  }
+
+  // El PUT sólo cambia lo que llega; el backend copia la expresión y el nombre a los nodos que la usan.
+  async updateCondition(conditionId: string, patch: ConditionInput) {
+    const response = await this.client.put(`/api/condiciones/${conditionId}`, pickDefined(patch));
+    return response.data;
+  }
+
+  async deleteCondition(conditionId: string) {
+    const response = await this.client.delete(`/api/condiciones/${conditionId}`);
+    return response.data;
+  }
+
+  // Por ID o por nombre (sin distinguir mayúsculas).
+  async findCondition(treeId: string, ref: string) {
+    const all: any[] = await this.listConditions(treeId);
+    const wanted = ref.trim().toLowerCase();
+    const found = all.filter((c) => c.condicion_id === ref || String(c.name).trim().toLowerCase() === wanted);
+    if (found.length === 1) return found[0];
+    throw new Error(
+      found.length ? `Hay ${found.length} condiciones llamadas "${ref}": usa su ID.` : `No existe la condición "${ref}". Hay: ${all.map((c) => c.name).join(', ') || 'ninguna'}.`
+    );
   }
 
   // --- 7b. CAPTURAS (preguntas reutilizables del slot filling) ---

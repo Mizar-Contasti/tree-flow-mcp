@@ -19,6 +19,7 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             ml_confidence_threshold?: undefined;
             fuzzy_confidence_threshold?: undefined;
             mode?: undefined;
+            condicionales?: undefined;
         };
         required?: undefined;
     };
@@ -50,6 +51,7 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             ml_confidence_threshold?: undefined;
             fuzzy_confidence_threshold?: undefined;
             mode?: undefined;
+            condicionales?: undefined;
         };
         required: string[];
     };
@@ -92,6 +94,7 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             ml_confidence_threshold?: undefined;
             fuzzy_confidence_threshold?: undefined;
             mode?: undefined;
+            condicionales?: undefined;
         };
         required: string[];
     };
@@ -136,6 +139,7 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             ml_confidence_threshold?: undefined;
             fuzzy_confidence_threshold?: undefined;
             mode?: undefined;
+            condicionales?: undefined;
         };
         required: string[];
     };
@@ -178,6 +182,7 @@ export declare function registerTreeTools(client: TreeflowClient): ({
             };
             nlp_mode: {
                 type: string;
+                enum: string[];
                 description: string;
             };
             sentiment_analysis_enabled: {
@@ -193,6 +198,10 @@ export declare function registerTreeTools(client: TreeflowClient): ({
                 description: string;
             };
             mode: {
+                type: string;
+                description: string;
+            };
+            condicionales: {
                 type: string;
                 description: string;
             };

@@ -29,7 +29,8 @@ export function registerTrainingTools(client) {
                     timeoutMs: Math.min(Math.max(args.esperar_segundos ?? 90, 5), 600) * 1000,
                 });
                 if (r.outcome === 'running') {
-                    return ok(`Sigue entrenando después de ${Math.round(r.seconds)} s. Consulta treeflow_get_training_status más tarde.`);
+                    const queued = r.status?.status === 'pendiente';
+                    return ok(`${queued ? 'Sigue en la cola de entrenamiento (un bot a la vez en todo el servidor, los planes mayores primero)' : 'Sigue entrenando'} después de ${Math.round(r.seconds)} s. Consulta treeflow_get_training_status más tarde.`);
                 }
                 const s = r.status ?? {};
                 const lines = [];

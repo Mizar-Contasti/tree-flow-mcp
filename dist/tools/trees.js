@@ -12,7 +12,10 @@ export function registerTreeTools(client) {
             },
             handler: async () => {
                 const trees = await client.listTrees();
-                return ok([`Bots (${trees.length}):`, ...trees.map((t) => `- ${treeHeader(t)}`)].join('\n'));
+                // Con ambientes, cada bot sale tres veces (Dev, QA y Prod): se dice cuál es cuál.
+                const agents = trees.map((t) => t.agente_id).filter(Boolean);
+                const withEnvs = new Set(agents).size < agents.length;
+                return ok([`Bots (${trees.length}):`, ...trees.map((t) => `- ${treeHeader(t, withEnvs)}`)].join('\n'));
             },
         },
         {
@@ -50,7 +53,7 @@ export function registerTreeTools(client) {
         },
         {
             name: 'treeflow_create_tree',
-            description: 'Crea un nuevo bot (árbol) en el espacio de trabajo de Treeflow.',
+            description: 'Crea un nuevo bot (árbol) en el espacio de trabajo de Treeflow. En una instancia nace en sus tres ambientes (Dev, QA, Prod) y devuelve el Dev. Si el plan llegó a su tope de bots, responde 400/403 con el motivo.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -74,11 +77,12 @@ export function registerTreeTools(client) {
                     description: { type: 'string', description: 'Nueva descripción' },
                     purpose: { type: 'string', description: 'Nuevo propósito' },
                     webhook_url: { type: 'string', description: 'URL de webhook principal' },
-                    nlp_mode: { type: 'string', description: 'Modo NLP: basic (reglas) o advanced (Machine Learning)' },
+                    nlp_mode: { type: 'string', enum: ['basic', 'pro'], description: 'basic, o pro (entidades con spaCy: sólo plan Enterprise; en otro plan responde 403)' },
                     sentiment_analysis_enabled: { type: 'boolean', description: 'Activar análisis de sentimiento en mensajes' },
                     ml_confidence_threshold: { type: 'number', description: 'Umbral de confianza para ML (0.0 a 1.0)' },
                     fuzzy_confidence_threshold: { type: 'number', description: 'Umbral de coincidencia difusa (0.0 a 1.0)' },
                     mode: { type: 'string', description: 'Modo de operación: expert, beginner, test' },
+                    condicionales: { type: 'boolean', description: '«Agregar condicionales»: el editor ofrece las condiciones en Respuesta y Transición. Las reglas ya guardadas funcionan igual apagado' },
                 },
                 required: ['tree_id'],
             },

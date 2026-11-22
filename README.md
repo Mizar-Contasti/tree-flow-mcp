@@ -88,15 +88,18 @@ Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
 | **base** | siempre | bots, ramas, hojas, intenciones, entidades, plantillas, detalle, borrar, guía, entrenar y simular |
 | **capturas** | sí | las preguntas reutilizables del slot filling |
 | **respaldos** | sí | snapshots, restaurar, exportar e importar |
+| condiciones | no | las condiciones guardadas que varios nodos comparten |
 | apis | no | las APIs y scripts que el bot ejecuta, sus pruebas y sus logs |
+| sql | no | conexiones y consultas SQL a la base del cliente (PostgreSQL, MySQL, SQL Server) |
 | pruebas | no | suites de prueba y sus ejecuciones |
 | atencion | no | transferencia a humano y mesa de ayuda (sólo lectura) |
 | historial | no | conversaciones reales, historial de cambios y de entrenamientos, y analíticas |
 | admin | no | configuración del bot (umbrales, NLP), canales, voz, usuarios y credenciales |
+| ambientes | no | ver Dev, QA y Prod de un bot y copiar entre ellos (sólo en instancias) |
 
 - `"TREEFLOW_TOOLSETS": "apis,pruebas"` carga la base más esos grupos (sustituye a los de
   por defecto: si los quieres también, nómbralos).
-- `"TREEFLOW_TOOLSETS": "todo"` carga las 62 herramientas.
+- `"TREEFLOW_TOOLSETS": "todo"` carga las 71 herramientas.
 - A mitad de una conversación, el modelo puede activar un grupo con
   `treeflow_enable_tools`. El servidor avisa al cliente (`tools/list_changed`); si tu
   cliente no recarga la lista, añade el grupo a la variable y reinícialo.
@@ -110,17 +113,48 @@ Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
 * `treeflow_get_tree_data(secciones, rama)`: el bot por secciones (`canvas`, `ramas`, `intenciones`, `entidades`, `plantillas`); por defecto canvas e intenciones. `rama` limita el canvas a una.
 * `treeflow_get_detail(tipo, ref)`: el detalle de una hoja, intención, entidad, plantilla, API o script, por ID o nombre.
 * `treeflow_create_branch` / `treeflow_update_branch`: las ramas (flujos) del canvas. Una rama nueva trae su hoja Start.
-* `treeflow_create_leaf` / `treeflow_update_leaf`: las hojas. `create_leaf` recibe una lista, las enlaza entre sí con `"ref:<ref>"` y las conecta desde una hoja existente con `connect`; `update_leaf` combina el config (una clave en `null` se borra) y acepta `add_routes` / `remove_routes`.
+* `treeflow_create_leaf` / `treeflow_update_leaf`: las hojas (también las reglas condicionales de Respuesta y Transición: ver «Condiciones»). `create_leaf` recibe una lista, las enlaza entre sí con `"ref:<ref>"` y las conecta desde una hoja existente con `connect`; `update_leaf` combina el config (una clave en `null` se borra) y acepta `add_routes` / `remove_routes`.
 * `treeflow_create_intent` / `treeflow_update_intent`: intenciones NLU. `create_intent` recibe una lista; `update_intent` acepta `add_patterns` / `remove_patterns`. Cada parámetro es `{ parameterName, entity, required, prompt }`, con la entidad por nombre (`color`, `sys.number`): el MCP la resuelve a su ID.
 * `treeflow_create_entity` / `treeflow_update_entity`: entidades. Igual, con `add_values` / `remove_values`.
 * `treeflow_save_message_template`: plantillas de mensaje: un texto, o bloques enriquecidos (botones, tarjetas…) dentro de un `payload`.
-* `treeflow_delete(tipo, ref)`: borra una rama, hoja, intención, entidad, plantilla, API, script, captura, transferencia o suite.
+* `treeflow_delete(tipo, ref)`: borra una rama, hoja, intención, entidad, plantilla, API, script, captura, transferencia, condición o suite.
 * `treeflow_trigger_training` / `treeflow_get_training_status`: reentrenar (espera a que termine; con `probar`, prueba mensajes al terminar) y consultar el estado. Si no hubo cambios desde el último entrenamiento no reentrena; `force: true` lo fuerza.
 * `treeflow_simulate_message`: probar el bot, siguiendo una conversación con su `session_id`.
 * `treeflow_guide(tema)`: referencia de plantillas, bloques enriquecidos, APIs, scripts, hojas, capturas y suites.
 
 ### Capturas
 * `treeflow_list_captures` / `treeflow_get_capture` / `treeflow_save_capture`.
+
+### Condiciones
+* `treeflow_list_conditions` / `treeflow_save_condition`: las condiciones guardadas del bot (nombre, expresión, descripción y en cuántos nodos se usan). `save_condition` sin `condition_ref` crea; con él (ID o nombre) modifica y copia el cambio a todos los nodos que la usan. Se borran con `treeflow_delete(tipo: condition)`: las reglas que la usaban se quedan con su expresión.
+* En un nodo, `config.respuestasCondicionales` (`{ name?, expression, messageTemplateId | messageText }`) y `config.rules` (Transición: `{ name?, expression, targetLeafId }`) se mandan con `create_leaf` / `update_leaf`. Gana la primera regla que se cumple; si ninguna, el mensaje o `nextLeafId` normal del nodo. Una regla puede llevar `condicion: "<nombre o ID>"` en vez de `expression`: el MCP la enlaza con la condición guardada y le pone el `id` que usa el editor. Una regla a medias no se guarda: el 422 del backend dice el nodo y lo que falta. Referencia y ejemplos de expresiones: `treeflow_guide("condiciones")`.
+
+  Ejemplo: «si es mayor de edad, otro mensaje y otro camino».
+  ```
+  treeflow_enable_tools(["condiciones"])
+  treeflow_save_condition(tree_id, name: "mayor", expression: "$edad >= 18")
+  treeflow_update_leaf(leaf_id, branch_id, config: {
+    respuestasCondicionales: [{ condicion: "mayor", messageText: "Bienvenido, adulto" }],   // qué dice
+    rules: [{ condicion: "mayor", targetLeafId: "<nodo Adulto>" }],                           // a dónde va
+    nextLeafId: "<nodo Menor>"                                                                // el «si no»
+  })
+  ```
+  Expresiones: `$edad >= 18` · `$plan == "pro"` · `$n == 5` (compara número aunque esté guardado como texto) · `"vip" in $nota` · `$nombre.startswith("A")` · `$pagado == true` · `$ciudad == ""` · `$a > 1 and ($b == "x" or $c)`. El lenguaje es el de las plantillas, sin llaves.
+
+  El MCP no lee ni enlaza la documentación web: todo lo que el modelo necesita va en `treeflow_guide`.
+* `treeflow_update_tree(condicionales)` enciende o apaga «Agregar condicionales» del editor; las reglas funcionan igual apagado. `get_tree_data` muestra las reglas de cada hoja (`respuestas si:`, `reglas:`, `si no→`).
+
+### sql
+* `treeflow_list_sql`: las conexiones (sin contraseña: sólo si la tienen) y las consultas del bot, con su ID, estado y variables.
+* `treeflow_save_sql_connection` / `treeflow_test_sql_connection`: la conexión a la base del cliente (`postgres`, `mysql` o `sqlserver`). Sin `password` al modificar se conserva la guardada, salvo que cambie el motor, host, puerto o usuario. La contraseña pasa por la conversación: si es delicada, que el usuario la escriba en Herramientas › SQL.
+* `treeflow_save_sql_query` / `treeflow_test_sql_query`: la consulta. Las variables van como `{$email}` **sin comillas** y se mandan aparte como parámetros; cada salida toma una columna de la primera fila (o `total`, `afectadas`, `filas.0.col`). Probarla la ejecuta de verdad. Se usa en un nodo con su ID en `config.toolIds`, y sus salidas son `{$variables}` para mensajes y reglas.
+* Se borran con `treeflow_delete(tipo: sql_query | sql_connection)`. `treeflow_guide("sql")` trae los ejemplos por motor.
+* El backend sólo se conecta a direcciones públicas (nunca localhost ni la base de Treeflow; una instancia puede abrir su red privada).
+
+### ambientes
+* `treeflow_list_environments`: los tres ambientes de un bot, sus versiones, lo que espera al Admin y las últimas publicaciones.
+* `treeflow_publish`: copia un ambiente a otro (con `confirm: true`; el destino queda igual al origen), `volver: true` devuelve un ambiente a su versión anterior y `cancelar` retira una solicitud. A Dev y QA se aplica en el acto; a **Prod queda pendiente hasta que la apruebe el Admin de la instancia**, que no se hace desde el MCP.
+* Sólo en las instancias: en la nube (`saas`) `publish` se niega. En una instancia, `list_trees` muestra cada bot con su ambiente, y un nombre repetido se resuelve a **Dev**; `"Nombre@qa"` o `"Nombre@prod"` eligen otro. QA y Prod se editan como Dev (no son de sólo lectura): lo normal es trabajar en Dev y copiar.
 
 ### Respaldos
 * `treeflow_list_backups` / `treeflow_create_backup`: snapshots del bot.
@@ -156,6 +190,37 @@ Medido con sesiones reales de Claude (Sonnet 5.5) sobre las mismas tareas
 
 ---
 
+## ✨ Novedades de la 1.4.0 (sobre la 1.3.1)
+
+Sincroniza el MCP con Treeflow 0.11.58 (condiciones, SQL, ambientes y el elemento «Nuevo mensaje»). No rompe nada de la 1.3.x.
+
+| Nuevo | Qué es |
+|---|---|
+| grupo **condiciones** | `treeflow_list_conditions` y `treeflow_save_condition` (64 herramientas con `todo`) |
+| `treeflow_delete` tipo `condition` | borra una condición guardada; acepta el nombre |
+| reglas en `create_leaf` / `update_leaf` | `config.rules` y `config.respuestasCondicionales`; `condicion` por nombre o ID, y `id` automático |
+| `treeflow_update_tree(condicionales)` | interruptor «Agregar condicionales» |
+| `treeflow_guide("condiciones")` | cómo armar un flujo condicional y ejemplos de expresiones |
+| `get_tree_data` / `treeflow_get_tree` | muestran las reglas de cada hoja y si el bot tiene condicionales |
+
+También en la 1.4.0 (resto de lo que cambió en Treeflow 0.10.x–0.11.x):
+
+| Nuevo | Qué es |
+|---|---|
+| grupo **sql** | 5 herramientas: conexiones y consultas a la base del cliente, con probar y guía por motor |
+| grupo **ambientes** | `treeflow_list_environments` y `treeflow_publish` (sólo instancias); `tree_id` acepta `"Nombre@qa"` |
+| `treeflow_simulate_message` | además dice qué scripts, APIs y SQL corrieron (entradas, las que llegaron vacías, salidas y su nombre en la sesión), qué regla de condición decidió y el recorrido por los nodos |
+| variables de script | tipo `auto` (el valor tal cual llega) |
+| `treeflow_update_tree` | `nlp_mode` es `basic` o `pro` (pro sólo Enterprise: otro plan recibe 403) |
+| `treeflow_trigger_training` | si sigue esperando turno dice que está en la cola |
+| bloque `message_break` | «Nuevo mensaje» en las respuestas enriquecidas: lo que va después sale en otra burbuja/mensaje (Treeflow 0.11.58) |
+| guías | `treeflow_guide("sql")`, y más en `condiciones`, `hojas`, `scripts` y `plantillas` (límites, true/false, errores 422) |
+| descripciones | transferencias (Telegram, webhook con adjuntos e `injected_context`), restaurar snapshot (qué restaura y qué conserva), regex de entidades |
+
+Errores que el backend explica y el MCP pasa tal cual al modelo: 403 por plan (MCP en Free, scripts y NLP pro fuera de su plan), 409 (entrenamiento en curso, publicación), 422 (texto roto, regla a medias, SQL con la variable entre comillas) y 429 (límite por minuto: esperar).
+
+No se expone a propósito: crear usuarios con contraseña, vincular el bot de Telegram de una transferencia y restaurar un respaldo por módulos (se hacen en el panel).
+
 ## 🔁 Cambios de la 1.3.0 que rompen con la 1.2.0
 
 | Antes | Ahora |
@@ -188,6 +253,7 @@ npm install
 npm test                 # compila y corre las pruebas (sin red)
 npm run medir            # cuánto pesa el catálogo; con --arbol "Nombre" mide también las lecturas
 node scripts/e2e-dev.mjs # de punta a punta contra un backend real, sobre un bot de pruebas propio
+node scripts/e2e-sql.mjs # las herramientas SQL contra una base real desechable (ver la cabecera del script)
 node scripts/sesion-real.mjs --tarea explorar --etiqueta prueba   # una sesión real de Claude, medida
 ```
 
@@ -213,6 +279,8 @@ ninguna herramienta apunte a una ruta inexistente:
 npm run build
 TREEFLOW_URL=https://api.tu-treeflow.com npm run validate:routes
 ```
+
+Necesita un backend con Swagger/OpenAPI activo: el de producción lo apaga, usa el de desarrollo o `--spec`.
 
 El script (`scripts/validate-routes.mjs`) extrae todas las llamadas de
 `src/client/treeflowClient.ts`, las normaliza y las contrasta con las rutas y métodos que

@@ -29,7 +29,7 @@ export function registerEntityTools(client) {
                                         },
                                     },
                                 },
-                                pattern: { type: 'string', description: 'Patrón si es regex (ej. ^[0-9]{5}$)' },
+                                pattern: { type: 'string', description: 'Patrón si es regex (ej. ^[0-9]{5}$). Se rechaza (422) una repetición anidada sin tope como (a+)+ o (\\d*)*; una fija como \\d{1,3}(\\.\\d{3}){2} sí vale' },
                             },
                             required: ['name'],
                         },

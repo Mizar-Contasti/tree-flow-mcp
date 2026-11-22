@@ -45,6 +45,7 @@ for (const s of await client.listTestSuites(T)) if (/^Suite[ _]e2e[ _]/.test(s.n
 for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
 for (const e of await client.listEntities(T)) if (e.name.startsWith('e2e_')) await client.deleteEntity(T, e.id);
 for (const m of await client.listMessageTemplates(T)) if (m.name.startsWith('e2e_')) await client.deleteMessageTemplate(m.id);
+for (const c of await client.listConditions(T)) if (c.name.startsWith('e2e_')) await client.deleteCondition(c.condicion_id);
 
 // La hoja donde empieza cada conversación nueva. Para que el motor vea una intención de
 // prueba, se enlaza ahí la rama de prueba y al final se deja como estaba.
@@ -321,9 +322,220 @@ assert.ok(!inicioAhora.config.intents.some((r) => r.name === `e2e_horario_${stam
 step('update_leaf con remove_routes quitó sólo esa ruta');
 await call('delete', { tree_id: BOT, tipo: 'leaf', ref: nuevaHoja });
 
-const probado = await measured('trigger_training', { tree_id: BOT, probar: ['hola', 'a qué hora abren'] });
+const probado = await measured('trigger_training', { tree_id: BOT, force: true, probar: ['hola', 'a qué hora abren'] });
 assert.match(probado, /^Entrenamiento terminado .*\nPruebas \(cada una en una conversación nueva\):\n- "hola" → intención \S+/);
 step('trigger_training entrenó y probó dos mensajes en una llamada');
+
+// ── Condiciones: interruptor, condición guardada, reglas de Respuesta y de Transición ──
+{
+  // Como el servidor MCP: el modelo recibe el detail del backend, no el AxiosError.
+  const rechazo = (promesa, patron) => assert.rejects(promesa, (e) => patron.test(String(e?.response?.data?.detail ?? e?.message)));
+  const wasOn = (await client.getTree(T)).condicionales;
+  await call('update_tree', { tree_id: T, condicionales: true });
+  assert.equal((await client.getTree(T)).condicionales, true);
+  assert.match(await call('get_tree_data', { tree_id: T, secciones: ['ramas'] }), /· condicionales/);
+
+  const mayor = await call('save_condition', { tree_id: T, name: `e2e_mayor_${stamp}`, expression: '$edad >= 18', description: 'adulto' });
+  assert.match(mayor, /^Condición creada:\n- e2e_mayor_\d+ \[\S+\] · \$edad >= 18 · 0 nodo\(s\)/);
+  await rechazo(call('save_condition', { tree_id: T, name: `e2e_mala_${stamp}`, expression: '$edad >>> 18' }), /no es una expresión válida/);
+  await rechazo(call('save_condition', { tree_id: T, name: `e2e_mayor_${stamp}`, expression: '$x == 1' }), /Ya hay una condición/);
+  step('save_condition creó una condición, rechazó una expresión inválida y un nombre repetido (el 422/409 llega con su explicación)');
+
+  const tplMayor = idOf(await call('save_message_template', { tree_id: T, name: `e2e_mayor_${stamp}`, text: 'Eres mayor de edad' }));
+  await call('create_intent', {
+    tree_id: T,
+    intents: ['e2e_edad_r', 'e2e_edad_t'].map((n, i) => ({
+      name: `${n}_${stamp}`, patterns: [i ? 'quiero ir por edad' : 'quiero consultar mi edad'],
+      entities: [{ parameterName: 'edad', entity: 'sys.number', required: true, prompt: '¿Cuántos años tienes?' }],
+    })),
+  });
+  const ramaC = await call('create_branch', { tree_id: T, name: `Rama e2e cond ${stamp}` });
+  const condBranch = ramaC.match(/Rama "[^"]+" \[([^\]]+)\]/)[1];
+  const condStart = ramaC.match(/- Start \([^)]*\) \[([^\]]+)\]/)[1];
+  const hojas = await call('create_leaf', {
+    branch_id: condBranch,
+    leaves: [
+      { ref: 'adulto', leaf_type: 'intent', name: 'Adulto e2e', config: { isCustomResponse: true, messageText: 'Camino adulto' } },
+      { ref: 'menor', leaf_type: 'intent', name: 'Menor e2e', config: { isCustomResponse: true, messageText: 'Camino menor' } },
+      {
+        ref: 'resp', leaf_type: 'intent', name: 'Respuesta e2e',
+        config: {
+          intentName: `e2e_edad_r_${stamp}`, isCustomResponse: true, messageText: 'Eres menor',
+          respuestasCondicionales: [
+            { condicion: `e2e_mayor_${stamp}`, messageTemplateId: tplMayor },
+            { name: 'Justo diez', expression: '$edad == 10', messageText: 'Justo diez, { $edad }' },
+          ],
+        },
+      },
+      {
+        ref: 'trans', leaf_type: 'intent', name: 'Transicion e2e',
+        config: {
+          intentName: `e2e_edad_t_${stamp}`, isCustomResponse: true, messageText: 'x',
+          rules: [{ condicion: `e2e_mayor_${stamp}`, targetLeafId: 'ref:adulto' }], nextLeafId: 'ref:menor',
+        },
+      },
+    ],
+  });
+  const respLeaf = hojas.match(/- Respuesta_e2e \(intent\) \[([^\]]+)\]/)[1];
+  const transLeaf = hojas.match(/- Transicion_e2e \(intent\) \[([^\]]+)\]/)[1];
+  assert.match(hojas, /respuestas si: e2e_mayor_\d+, Justo diez/);
+  assert.match(hojas, /reglas: e2e_mayor_\d+→Adulto_e2e/);
+
+  const saved = await json('get_detail', { tree_id: T, tipo: 'leaf', ref: transLeaf });
+  const regla = saved.config.rules[0];
+  assert.ok(regla.condicionId && regla.expression === '$edad >= 18' && regla.id, 'la regla enlazada toma la expresión y lleva id');
+  assert.equal(regla.condicion, undefined);
+  step('create_leaf guardó reglas de Respuesta y de Transición enlazadas a la condición guardada, por nombre');
+
+  // Una regla a medias no se guarda y el 422 dice qué falta
+  await rechazo(
+    call('create_leaf', { branch_id: condBranch, leaves: [{ leaf_type: 'intent', name: 'Mala e2e', config: { rules: [{ expression: '$a == 1' }] } }] }),
+    /No se guardó: en el nodo «Mala e2e» la regla 1 de la Transición no dice adónde ir/
+  );
+  step('una regla a medias se rechaza con el nodo y lo que falta');
+
+  // Que el motor las use: se enlazan desde el inicio por defecto
+  const main = (await client.listBranches(T)).find((b) => b.is_default);
+  const full = (id) => lookupShort(id) ?? id;
+  await call('update_leaf', {
+    leaf_id: main.start_leaf_id, branch_id: main.id,
+    add_routes: [{ name: `e2e_edad_r_${stamp}`, targetLeafId: respLeaf }, { name: `e2e_edad_t_${stamp}`, targetLeafId: transLeaf }],
+  });
+  await call('trigger_training', { tree_id: T });
+  const dice = async (frase, edad) => {
+    const a = await call('simulate_message', { tree_id: T, message: frase });
+    const b = await call('simulate_message', { tree_id: T, message: edad, session_id: a.match(/session_id: (\S+)/)[1] });
+    return b.match(/^Bot: "([^"]*)"/)?.[1];
+  };
+  const caso = async (esperado) => {
+    assert.deepEqual(
+      [await dice('quiero consultar mi edad', '20'), await dice('quiero consultar mi edad', '10'), await dice('quiero consultar mi edad', '5'),
+       await dice('quiero ir por edad', '20'), await dice('quiero ir por edad', '5')],
+      esperado
+    );
+  };
+  await caso(['Eres mayor de edad', 'Justo diez, 10', 'Eres menor', 'Camino adulto', 'Camino menor']);
+  step('el motor elige: la primera regla que se cumple en Respuesta y Transición, y el «si no» si ninguna');
+
+  const listada = await call('list_conditions', { tree_id: T });
+  assert.match(listada, /· 2 nodo\(s\)/);
+  const cambio = await call('save_condition', { tree_id: T, condition_ref: `e2e_mayor_${stamp}`, expression: '$edad >= 21', name: `e2e_mayor21_${stamp}` });
+  assert.match(cambio, /^Condición actualizada, 2 nodo\(s\) al día/);
+  await caso(['Eres menor', 'Justo diez, 10', 'Eres menor', 'Camino menor', 'Camino menor']);
+  const propagada = await json('get_detail', { tree_id: T, tipo: 'leaf', ref: transLeaf });
+  assert.equal(propagada.config.rules[0].expression, '$edad >= 21');
+  assert.equal(propagada.config.rules[0].name, `e2e_mayor21_${stamp}`);
+  step('editar la condición cambió la expresión y el nombre en los 2 nodos que la usan, y el motor lo notó');
+
+  const borrada = await call('delete', { tree_id: T, tipo: 'condition', ref: `e2e_mayor21_${stamp}` });
+  assert.match(borrada, /2 nodo\(s\) quedan con la regla propia/);
+  const propia = (await json('get_detail', { tree_id: T, tipo: 'leaf', ref: transLeaf })).config.rules[0];
+  assert.equal(propia.condicionId, undefined);
+  assert.equal(propia.expression, '$edad >= 21');
+  await caso(['Eres menor', 'Justo diez, 10', 'Eres menor', 'Camino menor', 'Camino menor']);
+  step('borrar la condición dejó las reglas con su expresión, y el bot sigue igual');
+
+  // Limpieza
+  await call('update_leaf', { leaf_id: main.start_leaf_id, branch_id: main.id, remove_routes: [`e2e_edad_r_${stamp}`, `e2e_edad_t_${stamp}`] });
+  await call('delete', { tree_id: T, tipo: 'branch', ref: condBranch });
+  for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
+  for (const m of await client.listMessageTemplates(T)) if (m.name.startsWith('e2e_')) await client.deleteMessageTemplate(m.id);
+  await call('update_tree', { tree_id: T, condicionales: wasOn });
+  await client.trainAndWait(T, { force: true });
+  step('limpieza de las condiciones: rama, intenciones, plantilla y condicionales como estaban');
+}
+
+// ── 1.4.0: ambientes, SQL sin base real, depuración del turno, nodo condition, linter ──
+{
+  const stamp2 = Date.now();
+  const rechazo = (promesa, patron) => assert.rejects(promesa, (e) => patron.test(String(e?.response?.data?.detail ?? e?.message)));
+
+  // Ambientes: el dev es saas, sin ellos. Ver es inocuo; publicar se niega antes de tocar nada.
+  assert.match(await call('list_environments', { tree_id: T }), /un solo ambiente/);
+  await assert.rejects(call('publish', { tree_id: T, destino: 'qa', confirm: true }), /no tiene ambientes/);
+  assert.match(await call('publish', { tree_id: T, destino: 'qa', confirm: false }), /falta confirm=true/);
+  assert.equal((await client.listTrees()).filter((t) => t.name === BOT).length, 1, 'publicar no debe haber creado copias');
+  step('list_environments dice que no hay ambientes y publish se niega sin crear copias (edición saas)');
+
+  // SQL: sin una base a la que llegar (el dev no abre redes privadas) se prueban las reglas y los errores
+  assert.match(await call('save_sql_connection', { tree_id: T, nombre: `e2e_c_${stamp2}`, motor: 'postgres', host: '8.8.8.8', base: 'x', usuario: 'u', password: 'p' }), /^Conexión creada:\n- e2e_c_\d+ \[\S+\] postgres 8\.8\.8\.8:5432\/x · usuario u · con contraseña/);
+  await rechazo(call('save_sql_connection', { tree_id: T, nombre: `e2e_mala_${stamp2}`, motor: 'oracle', host: 'x.com' }), /Motor no soportado/);
+  await rechazo(call('save_sql_connection', { tree_id: T, connection_ref: `e2e_c_${stamp2}`, host: '9.9.9.9' }), /vuelve a escribir la contraseña/);
+  await rechazo(call('save_sql_query', { tree_id: T, name: `e2e_q_${stamp2}`, connection: `e2e_c_${stamp2}`, sql: "SELECT * FROM t WHERE a = '{$x}'" }), /no puede ir entre comillas/);
+  await assert.rejects(call('save_sql_query', { tree_id: T, name: 'q', connection: 'no_existe', sql: 'SELECT 1' }), /No existe la conexión "no_existe"/);
+  const consulta = await call('save_sql_query', {
+    tree_id: T, name: `e2e_q_${stamp2}`, connection: `e2e_c_${stamp2}`, sql: 'SELECT nombre FROM t WHERE email = {$email}',
+    inputVariables: [{ name: 'email', testValue: 'a@b.c' }], outputVariables: [{ name: 'nombre' }],
+  });
+  assert.match(consulta, /estado unconfigured · entradas: email · salidas: nombre/);
+  const prueba = JSON.parse(await call('test_sql_query', { tree_id: T, query_ref: `e2e_q_${stamp2}` }));
+  assert.equal(prueba.estado, 'error');
+  assert.deepEqual(prueba.payload, { p_email: 'a@b.c' }, 'la variable va como parámetro, no pegada en el texto');
+  await assert.rejects(call('delete', { tree_id: T, tipo: 'sql_connection', ref: `e2e_c_${stamp2}` }), /la usan las consultas/);
+  await call('delete', { tree_id: T, tipo: 'sql_query', ref: `e2e_q_${stamp2}` });
+  await call('delete', { tree_id: T, tipo: 'sql_connection', ref: `e2e_c_${stamp2}` });
+  assert.match(await call('list_sql', { tree_id: T }), /^Conexiones \(0\):\nConsultas \(0\):/);
+  step('SQL: crear y cambiar conexiones y consultas, errores claros, la variable va como parámetro, y se borra');
+
+  // Depuración de un turno: script con entradas renombradas, regla de Transición y nodo condition
+  await call('create_intent', { tree_id: T, intents: [{ name: `e2e_dep_${stamp2}`, patterns: ['dame la edad e2e'], entities: [{ parameterName: 'edad', entity: 'sys.number', required: true, prompt: '¿Edad?' }] }] });
+  await call('save_script', {
+    tree_id: T, name: `e2e_doble_${stamp2}`, code: 'outputs = {"doble": int(inputs.get("n") or 0) * 2}',
+    inputVariables: [{ name: 'n', testValue: '4', type: 'auto' }, { name: 'vacia' }], outputVariables: [{ name: 'doble', jsonPath: 'doble' }],
+  });
+  const script = (await client.listFertilizers(T)).scripts.find((x) => x.name === `e2e_doble_${stamp2}`);
+  const ramaD = await call('create_branch', { tree_id: T, name: `Rama e2e dep ${stamp2}` });
+  const depBranch = ramaD.match(/Rama "[^"]+" \[([^\]]+)\]/)[1];
+  const depStart = ramaD.match(/- Start \([^)]*\) \[([^\]]+)\]/)[1];
+  const dep = await call('create_leaf', {
+    branch_id: depBranch,
+    leaves: [
+      { ref: 'adulto', leaf_type: 'message', name: 'Adulto dep', config: { isCustomResponse: true, messageText: 'Camino grande' } },
+      { ref: 'chico', leaf_type: 'message', name: 'Chico dep', config: { isCustomResponse: true, messageText: 'Camino chico' } },
+      { ref: 'cond', leaf_type: 'condition', name: 'Cond dep', config: { rules: [{ name: 'grande', expression: '$edad_doble > 20', targetLeafId: 'ref:adulto' }], elseLeafId: 'ref:chico' } },
+      {
+        ref: 'q', leaf_type: 'intent', name: 'Q dep',
+        config: {
+          intentName: `e2e_dep_${stamp2}`, isCustomResponse: true, messageText: 'x', nextLeafId: 'ref:cond', scriptIds: [script.id],
+          toolMappings: { [script.id]: { inputs: { n: 'edad' }, outputs: { doble: 'edad_doble' } } },
+        },
+      },
+    ],
+    connect: [{ from: depStart, name: `e2e_dep_${stamp2}`, to: 'ref:q' }],
+  });
+  assert.match(dep, /Cond_dep \(condition\) \[\S+\] · reglas: grande→Adulto_dep · si no→Chico_dep/);
+  const principal = (await client.listBranches(T)).find((b) => b.is_default);
+  const qLeaf = dep.match(/- Q_dep \(intent\) \[([^\]]+)\]/)[1];
+  await call('update_leaf', { leaf_id: principal.start_leaf_id, branch_id: principal.id, add_routes: [{ name: `e2e_dep_${stamp2}`, targetLeafId: qLeaf }] });
+  await call('trigger_training', { tree_id: T });
+  const turno = async (n) => {
+    const a = await call('simulate_message', { tree_id: T, message: 'dame la edad e2e' });
+    return call('simulate_message', { tree_id: T, message: n, session_id: a.match(/session_id: (\S+)/)[1] });
+  };
+  const grande = await turno('30');
+  assert.match(grande, /^Bot: "Camino grande"/);
+  assert.match(grande, /- script e2e_doble_\d+ ok \d+ms · entradas n=30, vacia=\(sin valor\) · guardó doble→edad_doble=60/);
+  assert.match(grande, /reglas: Cond_dep: se cumplió \$edad_doble > 20 → va a Adulto_dep/);
+  assert.match(grande, /recorrido: .*Adulto_dep/);
+  const chico = await turno('5');
+  assert.match(chico, /^Bot: "Camino chico"/);
+  assert.match(chico, /Cond_dep: ninguna regla se cumplió/);
+  step('simulate_message cuenta el script (entradas, la que no llegó, salida y nombre en la sesión), la regla que decidió y el recorrido; el nodo condition sigue funcionando');
+
+  // Linter: un nodo con la sintaxis vieja se rechaza con el porqué
+  await rechazo(
+    call('create_leaf', { branch_id: depBranch, leaves: [{ leaf_type: 'message', name: 'Rota e2e', config: { isCustomResponse: true, messageText: 'Hola {{$n}}' } }] }),
+    /es la sintaxis antigua/
+  );
+  step('un texto de nodo con {{ }} se rechaza con la explicación');
+
+  await call('update_leaf', { leaf_id: principal.start_leaf_id, branch_id: principal.id, remove_routes: [`e2e_dep_${stamp2}`] });
+  await call('delete', { tree_id: T, tipo: 'branch', ref: depBranch });
+  await call('delete', { tree_id: T, tipo: 'script', ref: script.id });
+  for (const i of await client.listIntents(T)) if (i.name.startsWith('e2e_')) await client.deleteIntent(T, i.id);
+  await client.trainAndWait(T, { force: true });
+  step('limpieza de la 1.4.0');
+}
 
 console.log('\nTamaño de las respuestas (caracteres):');
 for (const [k, v] of Object.entries(sizes)) console.log(`  ${k.padEnd(20)} ${v}`);

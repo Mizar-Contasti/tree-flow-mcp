@@ -20,8 +20,9 @@ export function registerTransferTools(client: TreeflowClient) {
     {
       name: 'treeflow_list_transfers',
       description:
-        'Lista las configuraciones de transferencia a humano del bot (derivar la conversación a un asesor). ' +
-        'Los tokens salen enmascarados (***).',
+        'Lista las configuraciones de transferencia a humano del bot (derivar la conversación a un asesor): endpoint externo ' +
+        'y/o Telegram (campo telegram: conectado, bot, vinculado). Los tokens salen enmascarados (***). Un nodo de ' +
+        'transferencia sin config elegida usa la activa MÁS ANTIGUA.',
       inputSchema: {
         type: 'object',
         properties: { tree_id: { type: 'string' } },
@@ -33,7 +34,10 @@ export function registerTransferTools(client: TreeflowClient) {
       name: 'treeflow_save_transfer',
       description:
         'Crea (sin config_id) o modifica (con config_id) una configuración de transferencia a humano. Al modificar ' +
-        'sólo hace falta mandar lo que cambia; un *** que devuelvas no pisa el token guardado.',
+        'sólo hace falta mandar lo que cambia; un *** que devuelvas no pisa el token guardado. Con endpoint_url el ' +
+        'webhook recibe human_transfer (historial en json/text/markdown, adjuntos, injected_context y la URL y token ' +
+        'para responder), visitor_message y visitor_left. Sin endpoint_url sólo va a la mesa de ayuda de Treeflow. ' +
+        'El destino Telegram (bot de BotFather + agente vinculado) se conecta desde el panel: lleva token. Máx. 20 por bot.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -53,7 +57,8 @@ export function registerTransferTools(client: TreeflowClient) {
     {
       name: 'treeflow_test_transfer',
       description:
-        'Prueba el envío de una transferencia: hace una petición real al endpoint externo configurado. ' +
+        'Prueba el envío de una transferencia: hace una petición real al endpoint externo configurado (o, si la config ' +
+        'tiene Telegram conectado, al bot de Telegram). ' +
         'Sin parámetros usa lo guardado; con ellos prueba valores distintos sin guardarlos.',
       inputSchema: {
         type: 'object',
